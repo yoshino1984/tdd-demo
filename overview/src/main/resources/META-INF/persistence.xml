@@ -10,7 +10,7 @@
             <property name="javax.persistence.jdbc.url" value="jdbc:hsqldb:file:target/myDB;shutdown=true"/>
             <property name="javax.persistence.jdbc.user" value="user"/>
             <property name="javax.persistence.jdbc.password" value="password"/>
-            <property name="javax.persistence.schema-generation.database.action" value="create"/>
+            <property name="javax.persistence.schema-generation.database.action" value="drop-and-create"/>
         </properties>
     </persistence-unit>
 </persistence>
