@@ -1,0 +1,16 @@
+package com.yoshino.args;
+
+import java.util.List;
+
+/**
+ * @author xiaoyi
+ * 2022/4/19 23:53
+ * @since
+ **/
+class BooleanOptionParser implements OptionParser {
+
+    @Override
+    public Object parse(List<String> arguments, Option option) {
+        return arguments.contains("-" + option.value());
+    }
+}
