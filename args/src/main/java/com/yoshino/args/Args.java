@@ -22,7 +22,7 @@ public class Args {
             Object[] values = Arrays.stream(constructor.getParameters()).map(it -> parseOption(arguments, it)).toArray();
 
             return (T) constructor.newInstance(values);
-        } catch (IllegalOptionException e) {
+        } catch (IllegalOptionException | UnsupportedOptionTypeException e) {
             throw e;
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -33,12 +33,19 @@ public class Args {
         if (!parameter.isAnnotationPresent(Option.class)) {
             throw new IllegalOptionException(parameter.getName());
         }
+        Option option = parameter.getAnnotation(Option.class);
+        if (!PARSERS.containsKey(parameter.getType())) {
+            throw new UnsupportedOptionTypeException(option.value(), parameter.getType());
+        }
         return PARSERS.get(parameter.getType()).parse(arguments, parameter.getAnnotation(Option.class));
     }
 
     private static final Map<Class<?>, OptionParser> PARSERS = Map.of(
-        boolean.class, bool(),
-        int.class, unary(0, Integer::parseInt),
-        String.class, unary("", String::valueOf));
+        boolean.class, OptionParsers.bool(),
+        int.class, OptionParsers.unary(0, Integer::parseInt),
+        String.class, OptionParsers.unary("", String::valueOf),
+        String[].class, OptionParsers.list(String[]::new, String::valueOf),
+        Integer[].class, OptionParsers.list(Integer[]::new, Integer::parseInt)
+    );
 
 }
