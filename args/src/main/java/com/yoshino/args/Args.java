@@ -6,6 +6,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
+import static com.yoshino.args.OptionParsers.bool;
+import static com.yoshino.args.OptionParsers.unary;
+
 /**
  * @author xiaoyi
  * 2022/4/19 00:59
@@ -34,8 +37,8 @@ public class Args {
     }
 
     private static final Map<Class<?>, OptionParser> PARSERS = Map.of(
-        boolean.class, new BooleanOptionParser(),
-        int.class, new SingleValuedOptionParser<>(0, Integer::parseInt),
-        String.class, new SingleValuedOptionParser<>("", String::valueOf));
+        boolean.class, bool(),
+        int.class, unary(0, Integer::parseInt),
+        String.class, unary("", String::valueOf));
 
 }
