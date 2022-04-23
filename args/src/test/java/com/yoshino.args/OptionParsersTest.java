@@ -56,7 +56,7 @@ class OptionParsersTest {
         }
 
         @Test
-        public void should_set_default_value_to_empty_for_int_option_by_action_verify() {
+        public void should_set_default_value_to_empty_for_int_option_by_behavior_verification() {
             Function parser = mock(Function.class);
 
             // exercise
@@ -98,7 +98,7 @@ class OptionParsersTest {
             assertArrayEquals(new String[]{"this", "is"}, OptionParsers.list(String[]::new, String::valueOf).parse(asList("-g", "this", "is"), option("g")));
         }
         @Test
-        public void should_parse_list_value_by_action_verify() {
+        public void should_parse_list_value_by_behavior_verification() {
             Function parser = mock(Function.class);
 
             OptionParsers.list(Object[]::new, parser).parse(asList("-g", "this", "is"), option("g"));
