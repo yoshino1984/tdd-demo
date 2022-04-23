@@ -6,15 +6,32 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
-import static com.yoshino.args.OptionParsers.bool;
-import static com.yoshino.args.OptionParsers.unary;
-
 /**
  * @author xiaoyi
  * 2022/4/19 00:59
  **/
-public class Args {
+public class Args<T> {
+    private static final Map<Class<?>, OptionParser> PARSERS = Map.of(
+        boolean.class, OptionParsers.bool(),
+        int.class, OptionParsers.unary(0, Integer::parseInt),
+        String.class, OptionParsers.unary("", String::valueOf),
+        String[].class, OptionParsers.list(String[]::new, String::valueOf),
+        Integer[].class, OptionParsers.list(Integer[]::new, Integer::parseInt)
+    );
+
     public static <T> T parse(Class<T> optionsClass, String... args) {
+        return new Args<T>(optionsClass, PARSERS).parse(args);
+    }
+
+    private Class<T> optionsClass;
+    Map<Class<?>, OptionParser> parsers;
+
+    public Args(Class<T> optionsClass, Map<Class<?>, OptionParser> parsers) {
+        this.optionsClass = optionsClass;
+        this.parsers = parsers;
+    }
+
+    public T parse(String... args) {
         try {
             List<String> arguments = Arrays.asList(args);
             Constructor<?> constructor = optionsClass.getDeclaredConstructors()[0];
@@ -29,23 +46,16 @@ public class Args {
         }
     }
 
-    private static Object parseOption(List<String> arguments, Parameter parameter) {
+    private Object parseOption(List<String> arguments, Parameter parameter) {
         if (!parameter.isAnnotationPresent(Option.class)) {
             throw new IllegalOptionException(parameter.getName());
         }
         Option option = parameter.getAnnotation(Option.class);
-        if (!PARSERS.containsKey(parameter.getType())) {
+        if (!parsers.containsKey(parameter.getType())) {
             throw new UnsupportedOptionTypeException(option.value(), parameter.getType());
         }
-        return PARSERS.get(parameter.getType()).parse(arguments, parameter.getAnnotation(Option.class));
+        return parsers.get(parameter.getType()).parse(arguments, parameter.getAnnotation(Option.class));
     }
 
-    private static final Map<Class<?>, OptionParser> PARSERS = Map.of(
-        boolean.class, OptionParsers.bool(),
-        int.class, OptionParsers.unary(0, Integer::parseInt),
-        String.class, OptionParsers.unary("", String::valueOf),
-        String[].class, OptionParsers.list(String[]::new, String::valueOf),
-        Integer[].class, OptionParsers.list(Integer[]::new, Integer::parseInt)
-    );
 
 }

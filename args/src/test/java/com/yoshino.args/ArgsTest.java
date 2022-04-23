@@ -1,9 +1,13 @@
 package com.yoshino.args;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
+import java.util.Map;
+
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 public class ArgsTest {
 
@@ -25,7 +29,8 @@ public class ArgsTest {
         assertEquals("port", e.getParameter());
     }
 
-    record OptionsWithoutAnnotation(@Option("l") boolean logging, int port, @Option("d") String directory) {}
+    record OptionsWithoutAnnotation(@Option("l") boolean logging, int port, @Option("d") String directory) {
+    }
 
     // sad path:
     // - bool -l t / -l tf
@@ -45,7 +50,25 @@ public class ArgsTest {
         assertArrayEquals(new Integer[]{1, 2, -3, 5}, options.decimals());
     }
 
-
     record ListOptions(@Option("g") String[] group, @Option("d") Integer[] decimals) {
+    }
+
+
+    @Test
+    public void should_parse_options_if_option_parser_provided() {
+        OptionParser boolParser = mock(OptionParser.class);
+        OptionParser intParser = mock(OptionParser.class);
+        OptionParser stringParser = mock(OptionParser.class);
+
+        when(boolParser.parse(any(), any())).thenReturn(true);
+        when(intParser.parse(any(), any())).thenReturn(1000);
+        when(stringParser.parse(any(), any())).thenReturn("parsed");
+
+        Args<MultiOptions> args = new Args<>(MultiOptions.class, Map.of(boolean.class, boolParser, int.class, intParser, String.class, stringParser));
+
+        MultiOptions options = args.parse("-l", "-p", "8080", "-d", "/usr/logs");
+        assertTrue(options.logging());
+        assertEquals(1000, options.port());
+        assertEquals("parsed", options.directory());
     }
 }
