@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.InOrder;
+import org.mockito.Mockito;
 
 import java.lang.annotation.Annotation;
 import java.util.List;
@@ -12,11 +14,12 @@ import java.util.function.Function;
 
 import static java.util.Arrays.asList;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 class OptionParsersTest {
 
     @Nested
-    class UnaryOptionParser {
+    class UnaryOptionParserTest {
 
         @Test //sad path
         public void should_not_accept_extra_argument_for_int_option() {
@@ -44,7 +47,6 @@ class OptionParsersTest {
             assertSame(defaultValue, OptionParsers.unary(defaultValue, whatever).parse(asList(), option("p")));
         }
 
-
         @Test
         public void should_set_default_value_to_empty_for_int_option() {
             Object parsed = new Object();
@@ -52,10 +54,21 @@ class OptionParsersTest {
             Object whatever = new Object();
             assertEquals(parsed, OptionParsers.unary(whatever, parser).parse(asList("-p", "8080"), option("p")));
         }
+
+        @Test
+        public void should_set_default_value_to_empty_for_int_option_by_action_verify() {
+            Function parser = mock(Function.class);
+
+            // exercise
+            OptionParsers.unary(any(), parser).parse(asList("-p", "8080"), option("p"));
+
+            // verify
+            verify(parser).apply("8080");
+        }
     }
 
     @Nested
-    class BooleanOptionParser {
+    class BooleanOptionParserTest {
         @Test // sad path:
         public void should_not_accept_extra_argument_for_boolean_option() {
             TooManyArgumentsException e = assertThrows(TooManyArgumentsException.class, () -> {
@@ -79,10 +92,20 @@ class OptionParsersTest {
     }
 
     @Nested
-    class ListOptionParser {
+    class ListOptionParserTest {
         @Test
         public void should_parse_list_value() {
             assertArrayEquals(new String[]{"this", "is"}, OptionParsers.list(String[]::new, String::valueOf).parse(asList("-g", "this", "is"), option("g")));
+        }
+        @Test
+        public void should_parse_list_value_by_action_verify() {
+            Function parser = mock(Function.class);
+
+            OptionParsers.list(Object[]::new, parser).parse(asList("-g", "this", "is"), option("g"));
+
+            InOrder order = inOrder(parser, parser);
+            order.verify(parser).apply("this");
+            order.verify(parser).apply("is");
         }
 
         @Test
