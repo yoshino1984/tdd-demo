@@ -12,6 +12,7 @@
     <modules>
         <module>overview</module>
         <module>args</module>
+        <module>agrs.practice</module>
     </modules>
 
     <properties>

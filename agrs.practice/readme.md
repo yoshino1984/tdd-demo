@@ -1,0 +1,22 @@
+todo list:
+- total function test 
+- happy path
+  - -l  
+  - -p 8080
+  - -d /usr/logs
+  - -l -p -8080 -d /usr/logs
+- sad path
+  - too many arguments
+  - insufficient arguments
+  - illegal value
+  - Args: illegal option - no annotation
+  - Args: unsupported option
+- default value
+  - l
+  - p
+- list type
+  - happy path
+    - parsers: parse success
+    - Args: parse success
+  - default value: []
+  - sad path : parse failed
