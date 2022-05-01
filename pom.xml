@@ -13,6 +13,7 @@
         <module>overview</module>
         <module>args</module>
         <module>agrs.practice</module>
+        <module>di.container</module>
     </modules>
 
     <properties>
