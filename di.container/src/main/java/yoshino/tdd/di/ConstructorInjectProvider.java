@@ -3,10 +3,7 @@ package yoshino.tdd.di;
 import jakarta.inject.Inject;
 import yoshino.tdd.di.exception.IllegalComponentException;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
+import java.lang.reflect.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -26,9 +23,18 @@ class ConstructorInjectProvider<T> implements ComponentProvider<T> {
     private final List<Method> injectMethods;
 
     public ConstructorInjectProvider(Class<T> type) {
+        if (Modifier.isAbstract(type.getModifiers())) {
+            throw new IllegalComponentException();
+        }
         this.injectConstructor = getInjectConstructor(type);
         this.injectFields = getInjectFields(type);
         this.injectMethods = getInjectMethods(type);
+        if (injectFields.stream().anyMatch(f -> Modifier.isFinal(f.getModifiers()))) {
+            throw new IllegalComponentException();
+        }
+        if (injectMethods.stream().anyMatch(m -> m.getTypeParameters().length != 0)) {
+            throw new IllegalComponentException();
+        }
     }
 
 

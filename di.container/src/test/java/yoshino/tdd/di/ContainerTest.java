@@ -40,8 +40,20 @@ public class ContainerTest {
             assertTrue(config.getContext().get(Component.class).isEmpty());
         }
 
-        // todo abstract
-        // todo interface
+
+        abstract class AbstractComponent implements Component {
+            @Inject
+            public AbstractComponent(Dependency dependency) {
+            }
+        }
+        @Test
+        public void should_throw_exception_if_component_is_abstract() {
+            assertThrows(IllegalComponentException.class, () -> new ConstructorInjectProvider<>(AbstractComponent.class));
+        }
+        @Test
+        public void should_throw_exception_if_component_is_interface() {
+            assertThrows(IllegalComponentException.class, () -> new ConstructorInjectProvider<>(Component.class));
+        }
 
         @Nested
         public class ConstructionInjection {
@@ -137,6 +149,7 @@ public class ContainerTest {
                 assertTrue(components.contains(AnotherDependency.class));
             }
 
+
         }
 
         @Nested
@@ -180,8 +193,15 @@ public class ContainerTest {
                 assertArrayEquals(new Class[]{Dependency.class}, provider.getDependencies().toArray());
             }
 
-            // todo field is final
-            // todo cyclic dependency
+            static class ComponentWithFinalFieldInjection implements Component {
+                @Inject
+                final Dependency dependency = null;
+            }
+
+            @Test
+            public void should_throw_exception_if_field_is_final() {
+                assertThrows(IllegalComponentException.class, () -> new ConstructorInjectProvider<>(ComponentWithFinalFieldInjection.class));
+            }
 
 
         }
@@ -301,9 +321,17 @@ public class ContainerTest {
                 assertEquals(0, component.called);
             }
 
-            // todo throw exception if method type is final
-            // todo throw exception if cyclic dependency
+            static class InjectMethodWithTypeParameter {
+                @Inject
+                <T> void install() {
 
+                }
+            }
+
+            @Test
+            public void should_throw_exception_if_inject_method_has_type_parameter() {
+                assertThrows(IllegalComponentException.class, () -> new ConstructorInjectProvider<>(InjectMethodWithTypeParameter.class));
+            }
 
         }
 
@@ -322,6 +350,12 @@ public class ContainerTest {
 
 
 interface Component {
+}
+
+interface Dependency {
+}
+
+interface AnotherDependency {
 }
 
 class ComponentWithDefaultConstructor implements Component {
@@ -360,9 +394,6 @@ class ComponentWithNoInjectNorDefaultConstructor implements Component {
 }
 
 
-interface Dependency {
-}
-
 class DependencyWithInjectConstructor implements Dependency {
     private String dependency;
 
@@ -385,8 +416,6 @@ class DependencyDependOnComponentConstructor implements Dependency {
     }
 }
 
-interface AnotherDependency {
-}
 
 class AnotherDependencyDependOnComponentConstructor implements AnotherDependency {
     private Component component;
