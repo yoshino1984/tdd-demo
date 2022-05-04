@@ -6,11 +6,14 @@ import yoshino.tdd.di.exception.IllegalComponentException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
-import java.util.stream.Stream;
 
 import static java.util.Arrays.stream;
+import static java.util.stream.Stream.concat;
 
 /**
  * @author xiaoyi
@@ -20,24 +23,26 @@ import static java.util.Arrays.stream;
 class ConstructorInjectProvider<T> implements ComponentProvider<T> {
     private final Constructor<T> injectConstructor;
     private final List<Field> injectFields;
-    private final List<Class<?>> dependencies;
+    private final List<Method> injectMethods;
 
     public ConstructorInjectProvider(Class<T> type) {
         this.injectConstructor = getInjectConstructor(type);
         this.injectFields = getInjectFields(type);
-        this.dependencies = getMergedDependencies();
+        this.injectMethods = getInjectMethods(type);
     }
+
 
     @Override
     public T get(Context context) {
         try {
-            Object[] objects = stream(injectConstructor.getParameterTypes())
-                .map(it -> context.get(it).get())
-                .toList().toArray();
-            T result = injectConstructor.newInstance(objects);
+            T result = injectConstructor.newInstance(stream(injectConstructor.getParameterTypes()).map(it1 -> context.get(it1).get()).toArray());
             for (Field field : injectFields) {
                 field.setAccessible(true);
                 field.set(result, context.get(field.getType()).get());
+            }
+            for (Method method : injectMethods) {
+                method.setAccessible(true);
+                method.invoke(result, stream(method.getParameterTypes()).map(it -> context.get(it).get()).toArray());
             }
             return result;
         } catch (InvocationTargetException | InstantiationException | IllegalAccessException e) {
@@ -48,7 +53,29 @@ class ConstructorInjectProvider<T> implements ComponentProvider<T> {
 
     @Override
     public List<Class<?>> getDependencies() {
-        return dependencies;
+        return concat(concat(stream(injectConstructor.getParameterTypes()), injectFields.stream().map(Field::getType)),
+            injectMethods.stream().flatMap(method -> stream(method.getParameterTypes()))).toList();
+    }
+
+    private static <T> List<Method> getInjectMethods(Class<T> type) {
+        List<Method> result = new ArrayList<>();
+        Class<?> currentType = type;
+        while (currentType != Object.class) {
+            result.addAll(stream(currentType.getDeclaredMethods())
+                .filter(it -> it.isAnnotationPresent(Inject.class))
+                .filter(it -> result.stream()
+                    .noneMatch(method -> it.getName().equals(method.getName())
+                        && Arrays.equals(it.getParameterTypes(), method.getParameterTypes())))
+                .filter(it -> stream(type.getDeclaredMethods())
+                    .filter(method -> !method.isAnnotationPresent(Inject.class))
+                    .noneMatch(method -> it.getName().equals(method.getName())
+                        && Arrays.equals(it.getParameterTypes(), method.getParameterTypes())))
+                .toList());
+            currentType = currentType.getSuperclass();
+        }
+
+        Collections.reverse(result);
+        return result;
     }
 
     private static <T> List<Field> getInjectFields(Class<T> type) {
@@ -76,7 +103,4 @@ class ConstructorInjectProvider<T> implements ComponentProvider<T> {
         });
     }
 
-    private List<Class<?>> getMergedDependencies() {
-        return Stream.concat(stream(injectConstructor.getParameterTypes()), injectFields.stream().map(Field::getType)).toList();
-    }
 }

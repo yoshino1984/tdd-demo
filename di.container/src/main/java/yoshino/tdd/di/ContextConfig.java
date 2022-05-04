@@ -1,15 +1,11 @@
 package yoshino.tdd.di;
 
-import jakarta.inject.Inject;
 import yoshino.tdd.di.exception.CyclicDependenciesException;
 import yoshino.tdd.di.exception.DependencyNotFoundException;
 
-import java.lang.reflect.Constructor;
 import java.util.*;
-import java.util.stream.Collectors;
 
-import static java.util.Arrays.stream;
-import static java.util.List.*;
+import static java.util.List.of;
 
 /**
  * @author xiaoyi
@@ -34,7 +30,7 @@ public class ContextConfig {
     }
 
     public <Type, Implementation extends Type> void bind(Class<Type> type, Class<Implementation> implementation) {
-        providers.put(type, new ConstructorInjectProvider(implementation));
+        providers.put(type, new ConstructorInjectProvider<>(implementation));
     }
 
     public Context getContext() {
