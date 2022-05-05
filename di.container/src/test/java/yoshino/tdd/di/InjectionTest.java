@@ -27,6 +27,12 @@ public class InjectionTest {
 
     @Nested
     public class ConstructionInjection {
+
+        static class ComponentWithDefaultConstructor implements Component {
+            public ComponentWithDefaultConstructor() {
+            }
+        }
+
         @Test
         public void should_bind_type_to_class_with_default_no_args_constructor() {
             config.bind(Component.class, ComponentWithDefaultConstructor.class);
@@ -51,6 +57,19 @@ public class InjectionTest {
             assertEquals(dependency, ((ComponentWithInjectConstructor) instance).getDependency());
         }
 
+        static class DependencyWithInjectConstructor implements Dependency {
+            private String dependency;
+
+            @Inject
+            DependencyWithInjectConstructor(String dependency) {
+                this.dependency = dependency;
+            }
+
+            public String getDependency() {
+                return dependency;
+            }
+        }
+
         @Test
         public void should_bind_type_to_class_with_transitive_inject_constructor() {
             config.bind(Component.class, ComponentWithInjectConstructor.class);
@@ -64,11 +83,28 @@ public class InjectionTest {
             assertEquals("dependency", ((DependencyWithInjectConstructor) dependency).getDependency());
         }
 
+        class ComponentWithMultiInjectConstructors implements Component {
+
+            @Inject
+            public ComponentWithMultiInjectConstructors(String name, Dependency dependency) {
+            }
+
+            @Inject
+            public ComponentWithMultiInjectConstructors(String name) {
+            }
+        }
+
         @Test
         public void should_throw_exception_if_multi_inject_constructors() {
             assertThrows(IllegalComponentException.class, () -> {
                 new ConstructorInjectProvider<>(ComponentWithMultiInjectConstructors.class);
             });
+        }
+
+        class ComponentWithNoInjectNorDefaultConstructor implements Component {
+
+            public ComponentWithNoInjectNorDefaultConstructor(String name) {
+            }
         }
 
         @Test
