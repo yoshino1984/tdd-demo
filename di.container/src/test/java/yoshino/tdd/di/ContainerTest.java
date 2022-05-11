@@ -16,11 +16,12 @@ public class ContainerTest {
     }
 
     @Nested
-    public class ComponentConstruction {
-    }
-
-    @Nested
     public class DependenciesSelection {
+
+        @Nested
+        public class ProviderType {
+
+        }
 
     }
 
@@ -42,18 +43,6 @@ interface Dependency {
 interface AnotherDependency {
 }
 
-class ComponentWithInjectConstructor implements Component {
-    private final Dependency dependency;
-
-    @Inject
-    public ComponentWithInjectConstructor(Dependency dependency) {
-        this.dependency = dependency;
-    }
-
-    public Dependency getDependency() {
-        return dependency;
-    }
-}
 
 
 

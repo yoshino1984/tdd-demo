@@ -1,16 +1,15 @@
 package yoshino.tdd.di;
 
 import jakarta.inject.Inject;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Named;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
+import jakarta.inject.Provider;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import yoshino.tdd.di.exception.CyclicDependenciesException;
 import yoshino.tdd.di.exception.DependencyNotFoundException;
 
+import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -110,6 +109,13 @@ public class ContextTest {
             assertTrue(config.getContext().get(Component.class).isEmpty());
         }
 
+        // todo cloud get provider<T> from context
+        @Test
+        @Disabled
+        public void should_retrieve_bind_type_as_provider() {
+        }
+
+
     }
 
     @Nested
@@ -207,10 +213,12 @@ public class ContextTest {
                 this.dependency = dependency;
             }
         }
+
         static class DependencyDependOnAnotherDependencyField implements Dependency {
             @Inject
             private AnotherDependency dependency;
         }
+
         static class DependencyDependOnAnotherDependencyMethod implements Dependency {
 
             @Inject
@@ -226,10 +234,12 @@ public class ContextTest {
 
             }
         }
+
         static class AnotherDependencyDependOnComponentField implements AnotherDependency {
             @Inject
             private Component component;
         }
+
         static class AnotherDependencyDependOnComponentMethod implements AnotherDependency {
             private Component component;
 
@@ -274,7 +284,7 @@ public class ContextTest {
             componentMap.forEach((componentKey, componentValue) ->
                 dependencyMap.forEach((dependencyKey, dependencyValue) ->
                     anotherDependencyMap.forEach((anotherKey, anotherValue) ->
-                    result.add(Arguments.of(Named.of(componentKey, componentValue), Named.of(dependencyKey, dependencyValue), Named.of(anotherKey, anotherValue))))));
+                        result.add(Arguments.of(Named.of(componentKey, componentValue), Named.of(dependencyKey, dependencyValue), Named.of(anotherKey, anotherValue))))));
 
             return result.stream();
         }
