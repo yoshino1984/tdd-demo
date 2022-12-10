@@ -4,7 +4,7 @@ todo list:
   - -l  
   - -p 8080
   - -d /usr/logs
-  - -l -p -8080 -d /usr/logs
+  - -l -p 8080 -d /usr/logs
 - sad path
   - too many arguments
   - insufficient arguments
