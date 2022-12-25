@@ -1,8 +1,15 @@
 package yoshino.tdd.di;
 
+import jakarta.inject.Inject;
+
+import java.lang.reflect.Constructor;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Supplier;
+
+import static java.util.Arrays.*;
 
 /**
  * @author xiaoyi
@@ -13,23 +20,34 @@ public class Context {
 
     private Map<Class<?>, Supplier<?>> providers = new HashMap<>();
 
-    public <ComponentType> void bind(Class<ComponentType> type, ComponentType instance) {
+    public <Type> void bind(Class<Type> type, Type instance) {
         providers.put(type, () -> instance);
     }
 
-    public <ComponentType, ComponentTypeImpl extends ComponentType>
-    void bind(Class<ComponentType> type, Class<ComponentTypeImpl> implementation) {
+    public <Type, Implementation extends Type>
+    void bind(Class<Type> type, Class<Implementation> implementation) {
         providers.put(type, () -> {
             try {
-                return implementation.getConstructor().newInstance();
+                Constructor<?> injectedConstructor = stream(implementation.getConstructors()).filter(it -> it.isAnnotationPresent(Inject.class)).findFirst()
+                    .orElseGet(() -> {
+                        try {
+                            return implementation.getConstructor();
+                        } catch (NoSuchMethodException e) {
+                            throw new RuntimeException(e);
+                        }
+                    });
+
+                Object[] objects = stream(injectedConstructor.getParameters()).map(parameter -> get(parameter.getType())).toArray();
+
+                return injectedConstructor.newInstance(objects);
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
         });
     }
 
-    public <ComponentType> ComponentType get(Class<ComponentType> type) {
-        return (ComponentType) providers.get(type).get();
+    public <Type> Type get(Class<Type> type) {
+        return (Type) providers.get(type).get();
     }
 
 
