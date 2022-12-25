@@ -60,6 +60,7 @@ public class ContainerTest {
                 assertEquals(dependency, ((ComponentWithDependencyInjectedConstructor) instance).getDependency());
             }
 
+            @Test
             public void should_bind_type_to_a_class_with_transitive_dependencies_injected() {
                 context.bind(Component.class, ComponentWithDependencyInjectedConstructor.class);
                 context.bind(Dependency.class, DependencyWithDependencyInjected.class);
@@ -118,7 +119,7 @@ class DependencyWithDependencyInjected implements Dependency {
     private String name;
 
     @Inject
-    DependencyWithDependencyInjected(String name) {
+    public DependencyWithDependencyInjected(String name) {
         this.name = name;
     }
 
