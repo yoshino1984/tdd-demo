@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 
+
 import static org.junit.jupiter.api.Assertions.*;
 
 
@@ -73,6 +74,21 @@ public class ContainerTest {
                 assertEquals("injected dependencies", ((DependencyWithDependencyInjected)dependency).getName());
             }
 
+            @Test
+            public void should_throw_exception_when_class_with_multi_injected_constructor() {
+                assertThrows(IllegalComponentException.class, () -> {
+                    context.bind(Component.class, ComponentWithMultiInjectedConstructors.class);
+                });
+            }
+
+            // todo no default constructor nor injected constructor
+            @Test
+            public void should_throw_exception_when_class_no_injected_constructor_nor_default_constructor() {
+                assertThrows(IllegalComponentException.class, () -> {
+                    context.bind(Component.class, ComponentWithNoInjectedNorDefaultConstructor.class);
+                });
+            }
+
         }
 
     }
@@ -115,6 +131,22 @@ class ComponentWithDependencyInjectedConstructor implements Component {
     }
 }
 
+class ComponentWithMultiInjectedConstructors implements Component{
+
+    @Inject
+    public ComponentWithMultiInjectedConstructors(String name) {
+    }
+    @Inject
+    public ComponentWithMultiInjectedConstructors(String name, Double value) {
+    }
+}
+
+class ComponentWithNoInjectedNorDefaultConstructor implements Component{
+
+    public ComponentWithNoInjectedNorDefaultConstructor(String name) {
+    }
+}
+
 class DependencyWithDependencyInjected implements Dependency {
     private String name;
 
@@ -127,4 +159,5 @@ class DependencyWithDependencyInjected implements Dependency {
         return name;
     }
 }
+
 
