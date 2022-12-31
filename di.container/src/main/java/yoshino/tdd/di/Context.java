@@ -8,6 +8,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static java.util.Arrays.*;
 
@@ -24,18 +25,15 @@ public class Context {
         providers.put(type, () -> instance);
     }
 
-    public <Type> Type get(Class<Type> type) {
-        if (providers.containsKey(type)) {
-            return (Type) providers.get(type).get();
-        }
-        throw new DependencyNotFoundException(type);
-    }
-
     public <Type, Implementation extends Type>
     void bind(Class<Type> type, Class<Implementation> implementation) {
         Constructor<?> injectedConstructor = getInjectConstructor(implementation);
 
-        providers.put(type, new ConstructorInjectionProvider(injectedConstructor));
+        providers.put(type, new ConstructorInjectionProvider<>(injectedConstructor, implementation));
+    }
+
+    public <Type> Optional<Type> get(Class<Type> type) {
+        return Optional.ofNullable(providers.get(type)).map(it -> (Type) it.get());
     }
 
     private static <Type, Implementation extends Type> Constructor<?> getInjectConstructor(Class<Implementation> implementation) {
@@ -56,23 +54,30 @@ public class Context {
     class ConstructorInjectionProvider<T> implements Provider<T> {
         private Constructor<?> constructor;
         private boolean constructed;
+        private Class<?> componentType;
 
-        public ConstructorInjectionProvider(Constructor<?> constructor) {
+        public ConstructorInjectionProvider(Constructor<?> constructor, Class<T> componentType) {
             this.constructor = constructor;
+            this.componentType = componentType;
         }
 
         @Override
         public T get() {
             if (constructed) {
-                throw new CyclicDependenciesException();
+                throw new CyclicDependenciesException(componentType);
             }
             constructed = true;
 
             try {
-                Object[] objects = stream(constructor.getParameters()).map(parameter -> Context.this.get(parameter.getType())).toArray();
+                Object[] objects = stream(constructor.getParameters())
+                    .map(it -> Context.this.get(it.getType()).orElseThrow(() -> new DependencyNotFoundException(it.getType())))
+                    .toArray();
                 return (T) constructor.newInstance(objects);
             } catch (InvocationTargetException | InstantiationException | IllegalAccessException e) {
                 throw new RuntimeException(e);
+            } catch (CyclicDependenciesException e)
+            {
+                throw new CyclicDependenciesException(e, componentType);
             }
         }
     }

@@ -6,6 +6,8 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 
+import java.util.Optional;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 
@@ -28,11 +30,18 @@ public class ContainerTest {
 
             context.bind(Component.class, instance);
 
-            assertEquals(instance, context.get(Component.class));
+            assertEquals(instance, context.get(Component.class).get());
         }
 
         // todo abstract class
         // todo interface
+
+        @Test
+        public void should_return_empty_if_cant_found_component() {
+            Optional<Component> component = context.get(Component.class);
+
+            assertTrue(component.isEmpty());
+        }
 
         @Nested
         public class ConstructorInjection {
@@ -41,7 +50,7 @@ public class ContainerTest {
             public void should_bind_type_to_a_class_with_default_constructor() {
                 context.bind(Component.class, ComponentWithDefaultConstructor.class);
 
-                Component instance = context.get(Component.class);
+                Component instance = context.get(Component.class).get();
 
                 assertNotNull(instance);
                 assertTrue(instance instanceof ComponentWithDefaultConstructor);
@@ -55,7 +64,7 @@ public class ContainerTest {
                 context.bind(Component.class, ComponentWithDependencyInjectedConstructor.class);
                 context.bind(Dependency.class, dependency);
 
-                Component instance = context.get(Component.class);
+                Component instance = context.get(Component.class).get();
                 assertNotNull(instance);
                 assertEquals(dependency, ((ComponentWithDependencyInjectedConstructor) instance).getDependency());
             }
@@ -66,7 +75,7 @@ public class ContainerTest {
                 context.bind(Dependency.class, DependencyWithDependencyInjected.class);
                 context.bind(String.class, "injected dependencies");
 
-                Component instance = context.get(Component.class);
+                Component instance = context.get(Component.class).get();
                 assertNotNull(instance);
                 Dependency dependency = ((ComponentWithDependencyInjectedConstructor) instance).getDependency();
                 assertNotNull(dependency);
@@ -92,7 +101,7 @@ public class ContainerTest {
                 context.bind(Component.class, ComponentWithDependencyInjectedConstructor.class);
 
                 DependencyNotFoundException exception = assertThrows(DependencyNotFoundException.class, () -> {
-                    context.get(Component.class);
+                    context.get(Component.class).get();
                 });
 
                 assertSame(exception.getInstance(), Dependency.class);
@@ -103,7 +112,10 @@ public class ContainerTest {
                 context.bind(Component.class, ComponentWithDependencyInjectedConstructor.class);
                 context.bind(Dependency.class, DependencyDependedOnComponent.class);
 
-                assertThrows(CyclicDependenciesException.class, () -> context.get(Component.class));
+                CyclicDependenciesException exception = assertThrows(CyclicDependenciesException.class, () -> context.get(Component.class).get());
+
+                assertTrue(exception.getDependencies().contains(ComponentWithDependencyInjectedConstructor.class));
+                assertTrue(exception.getDependencies().contains(DependencyDependedOnComponent.class));
             }
 
             @Test
@@ -112,9 +124,12 @@ public class ContainerTest {
                 context.bind(Dependency.class, DependencyDependedOnAnotherDependency.class);
                 context.bind(AnotherDependency.class, AnotherDependencyDependedOnComponent.class);
 
-                assertThrows(CyclicDependenciesException.class, () -> context.get(Component.class));
-            }
+                CyclicDependenciesException exception = assertThrows(CyclicDependenciesException.class, () -> context.get(Component.class).get());
 
+                assertTrue(exception.getDependencies().contains(ComponentWithDependencyInjectedConstructor.class));
+                assertTrue(exception.getDependencies().contains(DependencyDependedOnAnotherDependency.class));
+                assertTrue(exception.getDependencies().contains(AnotherDependencyDependedOnComponent.class));
+            }
         }
 
     }
