@@ -78,6 +78,9 @@
 - 方法注入
   - 通过 Inject 标注的方法，其参数为依赖组件
   - 通过 Inject 标注的无参数方法，会被调用
+  - 父类中的 inject 也会被调用
+    子类override后（带inject 调用子类方法）
+    子类override后（不带inject 父子类方法都不调用）
   - 按照子类中的规则，覆盖父类中的 inject 方法
   - 如果组件需要的依赖不存在，则抛出异常
   - 如果方法定义类型参数(type parameter)，则抛出异常
