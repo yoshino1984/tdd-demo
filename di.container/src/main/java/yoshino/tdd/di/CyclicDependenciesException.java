@@ -2,6 +2,7 @@ package yoshino.tdd.di;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Stack;
 
 /**
  * @author xiaoyi
@@ -20,6 +21,11 @@ public class CyclicDependenciesException extends RuntimeException {
         dependencies = new ArrayList<>();
         dependencies.addAll(e.getDependencies());
         dependencies.add(componentType);
+    }
+
+    public CyclicDependenciesException(Stack<Class<?>> visiting) {
+        dependencies = new ArrayList<>();
+        dependencies.addAll(visiting);
     }
 
 

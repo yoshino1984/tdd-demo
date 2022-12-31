@@ -100,9 +100,7 @@ public class ContainerTest {
             public void should_throw_exception_if_cant_find_dependency() {
                 config.bind(Component.class, ComponentWithDependencyInjectedConstructor.class);
 
-                DependencyNotFoundException exception = assertThrows(DependencyNotFoundException.class, () -> {
-                    config.getContext();
-                });
+                DependencyNotFoundException exception = assertThrows(DependencyNotFoundException.class, () -> config.getContext());
 
                 assertSame(exception.getInstance(), Dependency.class);
             }
@@ -112,10 +110,10 @@ public class ContainerTest {
                 config.bind(Component.class, ComponentWithDependencyInjectedConstructor.class);
                 config.bind(Dependency.class, DependencyDependedOnComponent.class);
 
-                CyclicDependenciesException exception = assertThrows(CyclicDependenciesException.class, () -> config.getContext().get(Component.class).get());
+                CyclicDependenciesException exception = assertThrows(CyclicDependenciesException.class, () -> config.getContext());
 
-                assertTrue(exception.getDependencies().contains(ComponentWithDependencyInjectedConstructor.class));
-                assertTrue(exception.getDependencies().contains(DependencyDependedOnComponent.class));
+                assertTrue(exception.getDependencies().contains(Component.class));
+                assertTrue(exception.getDependencies().contains(Dependency.class));
             }
 
             @Test
@@ -124,11 +122,11 @@ public class ContainerTest {
                 config.bind(Dependency.class, DependencyDependedOnAnotherDependency.class);
                 config.bind(AnotherDependency.class, AnotherDependencyDependedOnComponent.class);
 
-                CyclicDependenciesException exception = assertThrows(CyclicDependenciesException.class, () -> config.getContext().get(Component.class).get());
+                CyclicDependenciesException exception = assertThrows(CyclicDependenciesException.class, () -> config.getContext());
 
-                assertTrue(exception.getDependencies().contains(ComponentWithDependencyInjectedConstructor.class));
-                assertTrue(exception.getDependencies().contains(DependencyDependedOnAnotherDependency.class));
-                assertTrue(exception.getDependencies().contains(AnotherDependencyDependedOnComponent.class));
+                assertTrue(exception.getDependencies().contains(Component.class));
+                assertTrue(exception.getDependencies().contains(Dependency.class));
+                assertTrue(exception.getDependencies().contains(AnotherDependency.class));
             }
         }
 

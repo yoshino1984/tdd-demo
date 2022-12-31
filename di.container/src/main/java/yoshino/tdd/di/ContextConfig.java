@@ -6,10 +6,7 @@ import jakarta.inject.Provider;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Parameter;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static java.util.Arrays.*;
@@ -39,19 +36,27 @@ public class ContextConfig {
 
 
     public Context getContext() {
-        for (Class<?> component : dependencies.keySet()) {
-            for (Class<?> dependency : dependencies.get(component)) {
-                if (!dependencies.containsKey(dependency)) {
-                    throw new DependencyNotFoundException(dependency);
-                }
-            }
-        }
+        dependencies.keySet().forEach(component -> checkDependencies(component, new Stack<>()));
         return new Context() {
             @Override
             public <Type> Optional<Type> get(Class<Type> type) {
                 return Optional.ofNullable(providers.get(type)).map(it -> (Type) it.get(this));
             }
         };
+    }
+
+    private void checkDependencies(Class<?> component, Stack<Class<?>> visiting) {
+        for (Class<?> dependency : dependencies.get(component)) {
+            if (!dependencies.containsKey(dependency)) {
+                throw new DependencyNotFoundException(dependency);
+            }
+            if (visiting.contains(dependency)) {
+                throw new CyclicDependenciesException(visiting);
+            }
+            visiting.push(dependency);
+            checkDependencies(dependency, visiting);
+            visiting.pop();
+        }
     }
 
     private static <Type, Implementation extends Type> Constructor<?> getInjectConstructor(Class<Implementation> implementation) {
