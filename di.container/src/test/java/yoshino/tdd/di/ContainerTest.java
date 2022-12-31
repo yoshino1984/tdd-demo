@@ -130,6 +130,68 @@ public class ContainerTest {
             }
         }
 
+        @Nested
+        class FieldInjection {
+            static class ComponentWithFieldInject {
+                @Inject
+                Dependency dependency;
+            }
+
+            static class ComponentWithFieldInjectSubclass extends ComponentWithFieldInject {}
+
+            @Test
+            public void should_inject_via_field() {
+                Dependency dependency = new Dependency() {
+                };
+
+                config.bind(Dependency.class, dependency);
+                config.bind(ComponentWithFieldInject.class, ComponentWithFieldInject.class);
+
+                ComponentWithFieldInject component = config.getContext().get(ComponentWithFieldInject.class).get();
+
+                assertSame(dependency, component.dependency);
+            }
+
+            @Test
+            public void should_inject_field_via_superclass() {
+                Dependency dependency = new Dependency() {
+                };
+
+                config.bind(Dependency.class, dependency);
+                config.bind(ComponentWithFieldInjectSubclass.class, ComponentWithFieldInjectSubclass.class);
+
+                ComponentWithFieldInjectSubclass component = config.getContext().get(ComponentWithFieldInjectSubclass.class).get();
+
+                assertSame(dependency, component.dependency);
+            }
+
+            @Test
+            public void should_return_correct_dependencies_via_field_inject() {
+                ConstructorInjectionProvider<ComponentWithFieldInjectSubclass> provider = new ConstructorInjectionProvider<>(ComponentWithFieldInjectSubclass.class);
+                assertArrayEquals(new Class<?>[]{Dependency.class}, provider.getDependencies().toArray());
+            }
+
+            static class ComponentWithFinalFieldInject {
+                @Inject
+                final Dependency dependency;
+
+                public ComponentWithFinalFieldInject() {
+                    this.dependency = null;
+                }
+            }
+
+            @Test
+            public void should_throw_exception_if_inject_field_is_final() {
+                Dependency dependency = new Dependency() {
+                };
+
+                config.bind(Dependency.class, dependency);
+                config.bind(ComponentWithFinalFieldInject.class, ComponentWithFinalFieldInject.class);
+
+                assertThrows(IllegalComponentException.class, () -> config.getContext().get(ComponentWithFinalFieldInject.class).get());
+            }
+        }
+
     }
 
     @Nested
