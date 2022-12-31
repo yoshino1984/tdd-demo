@@ -6,7 +6,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 
-
 import static org.junit.jupiter.api.Assertions.*;
 
 
@@ -71,7 +70,7 @@ public class ContainerTest {
                 assertNotNull(instance);
                 Dependency dependency = ((ComponentWithDependencyInjectedConstructor) instance).getDependency();
                 assertNotNull(dependency);
-                assertEquals("injected dependencies", ((DependencyWithDependencyInjected)dependency).getName());
+                assertEquals("injected dependencies", ((DependencyWithDependencyInjected) dependency).getName());
             }
 
             @Test
@@ -81,12 +80,39 @@ public class ContainerTest {
                 });
             }
 
-            // todo no default constructor nor injected constructor
             @Test
             public void should_throw_exception_when_class_no_injected_constructor_nor_default_constructor() {
                 assertThrows(IllegalComponentException.class, () -> {
                     context.bind(Component.class, ComponentWithNoInjectedNorDefaultConstructor.class);
                 });
+            }
+
+            @Test
+            public void should_throw_exception_if_cant_find_dependency() {
+                context.bind(Component.class, ComponentWithDependencyInjectedConstructor.class);
+
+                DependencyNotFoundException exception = assertThrows(DependencyNotFoundException.class, () -> {
+                    context.get(Component.class);
+                });
+
+                assertSame(exception.getInstance(), Dependency.class);
+            }
+
+            @Test
+            public void should_throw_exception_if_exist_cyclic_dependencies() {
+                context.bind(Component.class, ComponentWithDependencyInjectedConstructor.class);
+                context.bind(Dependency.class, DependencyDependedOnComponent.class);
+
+                assertThrows(CyclicDependenciesException.class, () -> context.get(Component.class));
+            }
+
+            @Test
+            public void should_throw_exception_if_exist_transitive_cyclic_dependencies() {
+                context.bind(Component.class, ComponentWithDependencyInjectedConstructor.class);
+                context.bind(Dependency.class, DependencyDependedOnAnotherDependency.class);
+                context.bind(AnotherDependency.class, AnotherDependencyDependedOnComponent.class);
+
+                assertThrows(CyclicDependenciesException.class, () -> context.get(Component.class));
             }
 
         }
@@ -109,13 +135,16 @@ interface Component {
 
 }
 
+interface Dependency {
+}
+
+interface AnotherDependency {
+}
+
 class ComponentWithDefaultConstructor implements Component {
 
     public ComponentWithDefaultConstructor() {
     }
-}
-
-interface Dependency {
 }
 
 class ComponentWithDependencyInjectedConstructor implements Component {
@@ -131,17 +160,18 @@ class ComponentWithDependencyInjectedConstructor implements Component {
     }
 }
 
-class ComponentWithMultiInjectedConstructors implements Component{
+class ComponentWithMultiInjectedConstructors implements Component {
 
     @Inject
     public ComponentWithMultiInjectedConstructors(String name) {
     }
+
     @Inject
     public ComponentWithMultiInjectedConstructors(String name, Double value) {
     }
 }
 
-class ComponentWithNoInjectedNorDefaultConstructor implements Component{
+class ComponentWithNoInjectedNorDefaultConstructor implements Component {
 
     public ComponentWithNoInjectedNorDefaultConstructor(String name) {
     }
@@ -160,4 +190,30 @@ class DependencyWithDependencyInjected implements Dependency {
     }
 }
 
+class DependencyDependedOnComponent implements Dependency {
+    private Component component;
+
+    @Inject
+    public DependencyDependedOnComponent(Component component) {
+        this.component = component;
+    }
+}
+
+class DependencyDependedOnAnotherDependency implements Dependency {
+    private AnotherDependency dependency;
+
+    @Inject
+    public DependencyDependedOnAnotherDependency(AnotherDependency dependency) {
+        this.dependency = dependency;
+    }
+}
+
+class AnotherDependencyDependedOnComponent implements AnotherDependency {
+    private Component component;
+
+    @Inject
+    public AnotherDependencyDependedOnComponent(Component component) {
+        this.component = component;
+    }
+}
 
