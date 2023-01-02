@@ -2,7 +2,6 @@ package yoshino.tdd.di;
 
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
@@ -34,11 +33,8 @@ public class ContainerTest {
             assertEquals(instance, config.getContext().get(Component.class).get());
         }
 
-        // todo abstract class
-        // todo interface
-
         @Test
-        public void should_return_empty_if_cant_found_component() {
+        public void should_return_empty_if_component_not_defined() {
             Optional<Component> component = config.getContext().get(Component.class);
 
             assertTrue(component.isEmpty());
@@ -129,6 +125,22 @@ public class ContainerTest {
                 assertTrue(exception.getDependencies().contains(Dependency.class));
                 assertTrue(exception.getDependencies().contains(AnotherDependency.class));
             }
+
+            abstract class AbstractComponent {
+                @Inject
+                public AbstractComponent() {
+                }
+            }
+            @Test
+            public void should_throw_exception_if_component_is_abstract() {
+                assertThrows(IllegalComponentException.class, () -> new ConstructorInjectionComponentProvider<>(AbstractComponent.class));
+            }
+
+            @Test
+            public void should_throw_exception_if_component_is_interface() {
+                assertThrows(IllegalComponentException.class, () -> new ConstructorInjectionComponentProvider<>(Component.class));
+            }
+
         }
 
         @Nested
@@ -168,28 +180,19 @@ public class ContainerTest {
 
             @Test
             public void should_return_correct_dependencies_via_field_inject() {
-                ConstructorInjectionProvider<ComponentWithFieldInjectSubclass> provider = new ConstructorInjectionProvider<>(ComponentWithFieldInjectSubclass.class);
+                ConstructorInjectionComponentProvider<ComponentWithFieldInjectSubclass> provider = new ConstructorInjectionComponentProvider<>(ComponentWithFieldInjectSubclass.class);
                 assertArrayEquals(new Class<?>[]{Dependency.class}, provider.getDependencies().toArray());
             }
 
             static class ComponentWithFinalFieldInject {
                 @Inject
-                final Dependency dependency;
+                final Dependency dependency = null;
 
-                public ComponentWithFinalFieldInject() {
-                    this.dependency = null;
-                }
             }
 
             @Test
             public void should_throw_exception_if_inject_field_is_final() {
-                Dependency dependency = new Dependency() {
-                };
-
-                config.bind(Dependency.class, dependency);
-                config.bind(ComponentWithFinalFieldInject.class, ComponentWithFinalFieldInject.class);
-
-                assertThrows(IllegalComponentException.class, () -> config.getContext().get(ComponentWithFinalFieldInject.class).get());
+                assertThrows(IllegalComponentException.class, () -> new ConstructorInjectionComponentProvider<>(ComponentWithFinalFieldInject.class));
             }
         }
 
@@ -284,8 +287,18 @@ public class ContainerTest {
 
             @Test
             public void  should_include_dependencies_via_inject_method() {
-                ConstructorInjectionProvider<InjectMethodWithDependency> provider = new ConstructorInjectionProvider<>(InjectMethodWithDependency.class);
+                ConstructorInjectionComponentProvider<InjectMethodWithDependency> provider = new ConstructorInjectionComponentProvider<>(InjectMethodWithDependency.class);
                 assertArrayEquals(new Class<?>[]{Dependency.class}, provider.getDependencies().toArray(Class<?>[]::new));
+            }
+
+            // todo exception if include type parameter
+            static class InjectMethodWithTypeParameter {
+                @Inject
+                <T> void install() {}
+            }
+            @Test
+            public void should_throw_exception_if_contain_type_parameter() {
+                assertThrows(IllegalComponentException.class, () -> new ConstructorInjectionComponentProvider<>(InjectMethodWithTypeParameter.class));
             }
         }
 

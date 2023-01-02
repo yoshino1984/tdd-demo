@@ -8,7 +8,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static java.util.Arrays.stream;
 import static java.util.stream.Stream.concat;
@@ -18,17 +17,28 @@ import static java.util.stream.Stream.concat;
  * 2022/12/31 13:22
  * @since
  **/
-class ConstructorInjectionProvider<T> implements ComponentProvider<T> {
+class ConstructorInjectionComponentProvider<T> implements ComponentProvider<T> {
     private Constructor<?> injectConstructor;
 
     private List<Field> injectFields;
 
     private List<Method> injectMethods;
 
-    public ConstructorInjectionProvider(Class<T> componentType) {
+    public ConstructorInjectionComponentProvider(Class<T> componentType) {
+        if (Modifier.isAbstract(componentType.getModifiers())) {
+            throw new IllegalComponentException();
+        }
+
         this.injectConstructor = getInjectConstructor(componentType);
         this.injectFields = getInjectFields(componentType);
         this.injectMethods = getInjectMethods(componentType);
+
+        if (injectFields.stream().anyMatch(it -> Modifier.isFinal(it.getModifiers()))) {
+            throw new IllegalComponentException();
+        }
+        if (injectMethods.stream().anyMatch(it -> it.getTypeParameters().length > 0)) {
+            throw new IllegalComponentException();
+        }
     }
 
     @Override
@@ -37,9 +47,6 @@ class ConstructorInjectionProvider<T> implements ComponentProvider<T> {
             Object[] objects = stream(injectConstructor.getParameters()).map(it -> context.get(it.getType()).get()).toArray();
             T result = (T) injectConstructor.newInstance(objects);
             for (Field field : injectFields) {
-                if (Modifier.isFinal(field.getModifiers())) {
-                    throw new IllegalComponentException();
-                }
                 field.setAccessible(true);
                 field.set(result, context.get(field.getType()).get());
             }
