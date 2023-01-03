@@ -23,6 +23,11 @@ public class ContainerTest {
     @Nested
     public class DependenciesSelectionConstruction {
 
+        @Nested
+        class ProviderType {
+
+        }
+
     }
 
     @Nested

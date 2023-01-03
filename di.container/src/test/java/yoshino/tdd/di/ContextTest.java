@@ -1,14 +1,13 @@
 package yoshino.tdd.di;
 
 import jakarta.inject.Inject;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Named;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
+import jakarta.inject.Provider;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -31,21 +30,53 @@ public class ContextTest {
         config = new ContextConfig();
     }
 
-    @Test
-    public void should_bind_type_to_a_specific_instance() {
-        Component instance = new Component() {
-        };
+    @Nested
+    class BindingType {
 
-        config.bind(Component.class, instance);
+        @Test
+        public void should_bind_type_to_a_specific_instance() {
+            Component instance = new Component() {
+            };
 
-        assertEquals(instance, config.getContext().get(Component.class).get());
-    }
+            config.bind(Component.class, instance);
 
-    @Test
-    public void should_return_empty_if_component_not_defined() {
-        Optional<Component> component = config.getContext().get(Component.class);
+            assertEquals(instance, config.getContext().get(Component.class).get());
+        }
 
-        assertTrue(component.isEmpty());
+        @Test
+        public void should_retrieve_empty_for_unbind_type() {
+            Optional<Component> component = config.getContext().get(Component.class);
+
+            assertTrue(component.isEmpty());
+        }
+
+        @Test
+        public void should_retrieve_bind_type_as_provider() {
+            Component instance = new Component() {
+            };
+            config.bind(Component.class, instance);
+
+            ParameterizedType type = new TypeLiteral<Provider<Component>>() {}.getType();
+            Provider<Component> provider = (Provider<Component>) config.getContext().get(type).get();
+
+            assertSame(instance, provider.get());
+        }
+
+        @Test
+        public void should_not_retrieve_bind_type_for_unsupported_type() {
+            Component instance = new Component() {
+            };
+            config.bind(Component.class, instance);
+            ParameterizedType type = new TypeLiteral<List<Component>>() {}.getType();
+            assertFalse(config.getContext().get(type).isPresent());
+        }
+
+        abstract class TypeLiteral<T> {
+            public ParameterizedType getType() {
+                return (ParameterizedType) ((ParameterizedType) getClass().getGenericSuperclass()).getActualTypeArguments()[0];
+            }
+        }
+
     }
 
     @Nested

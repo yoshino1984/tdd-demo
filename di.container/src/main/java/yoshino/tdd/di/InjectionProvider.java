@@ -99,11 +99,21 @@ class InjectionProvider<T> implements ComponentProvider<T> {
 
 
     private static Object toDependency(Context context, Field field) {
-        return context.get(field.getType()).get();
+        Type type = field.getGenericType();
+        if (type instanceof ParameterizedType) {
+            return context.get((ParameterizedType) type).get();
+        }
+        return context.get((Class<?>) field.getType()).get();
     }
 
     private static Object[] toDependencies(Context context, Executable constructor) {
-        return stream(constructor.getParameters()).map(it -> context.get(it.getType()).get()).toArray(Object[]::new);
+        return stream(constructor.getParameters()).map(p -> {
+            Type type = p.getParameterizedType();
+            if (type instanceof ParameterizedType) {
+                return context.get((ParameterizedType) type).get();
+            }
+            return context.get((Class<?>) p.getType()).get();
+        }).toArray(Object[]::new);
     }
 
     private static boolean isOverrideByNoInjectMethod(Class<?> componentType, Method m) {

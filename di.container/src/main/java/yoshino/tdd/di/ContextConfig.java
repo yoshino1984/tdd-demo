@@ -1,5 +1,9 @@
 package yoshino.tdd.di;
 
+import jakarta.inject.Provider;
+
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.*;
 
 /**
@@ -26,6 +30,16 @@ public class ContextConfig {
             @Override
             public <Type> Optional<Type> get(Class<Type> type) {
                 return Optional.ofNullable(providers.get(type)).map(it -> (Type) it.get(this));
+            }
+
+            @Override
+            public Optional get(ParameterizedType type) {
+                if (type.getRawType() != Provider.class) {
+                    return Optional.empty();
+                }
+                Type componentType = type.getActualTypeArguments()[0];
+                return Optional.ofNullable(providers.get(componentType))
+                    .map(provider -> (Provider<Object>) () -> provider.get(this));
             }
         };
     }
