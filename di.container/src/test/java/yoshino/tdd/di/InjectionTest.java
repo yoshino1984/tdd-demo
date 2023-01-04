@@ -29,8 +29,8 @@ public class InjectionTest {
     @BeforeEach
     public void setUp() throws NoSuchFieldException {
         dependencyType = (ParameterizedType) InjectionTest.class.getDeclaredField("dependencyProvider").getGenericType();
-        when(context.get(eq(Dependency.class))).thenReturn(Optional.of(dependency));
-        when(context.get(eq(dependencyType))).thenReturn(Optional.of(dependencyProvider));
+        when(context.getType(eq(Dependency.class))).thenReturn(Optional.of(dependency));
+        when(context.getType(eq(dependencyType))).thenReturn(Optional.of(dependencyProvider));
     }
 
     @Nested
@@ -58,7 +58,7 @@ public class InjectionTest {
             public void should_include_dependency_via_inject_constructor() {
                 InjectionProvider<ComponentWithDependencyInjectedConstructor> provider = new InjectionProvider<>(ComponentWithDependencyInjectedConstructor.class);
 
-                assertArrayEquals(new Class<?>[]{Dependency.class}, provider.getDependencies().toArray());
+                assertArrayEquals(new Type[]{Dependency.class}, provider.getDependencyTypes().toArray(Type[]::new));
             }
 
             @Test
@@ -148,7 +148,8 @@ public class InjectionTest {
             @Test
             public void should_inject_dependency_from_field_dependency() {
                 InjectionProvider<ComponentWithFieldInjectSubclass> provider = new InjectionProvider<>(ComponentWithFieldInjectSubclass.class);
-                assertArrayEquals(new Class<?>[]{Dependency.class}, provider.getDependencies().toArray());
+                assertArrayEquals(new Type[]{Dependency.class}, provider.getDependencyTypes().toArray(Type[]::new));
+
             }
 
             @Test
@@ -281,7 +282,7 @@ public class InjectionTest {
             @Test
             public void should_inject_dependency_from_method_dependency() {
                 InjectionProvider<InjectMethodWithDependency> provider = new InjectionProvider<>(InjectMethodWithDependency.class);
-                assertArrayEquals(new Class<?>[]{Dependency.class}, provider.getDependencies().toArray(Class<?>[]::new));
+                assertArrayEquals(new Type[]{Dependency.class}, provider.getDependencyTypes().toArray(new Type[0]));
             }
 
             @Test

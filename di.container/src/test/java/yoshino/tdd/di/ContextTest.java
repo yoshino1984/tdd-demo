@@ -40,12 +40,12 @@ public class ContextTest {
 
             config.bind(Component.class, instance);
 
-            assertEquals(instance, config.getContext().get(Component.class).get());
+            assertEquals(instance, config.getContext().getType(Component.class).get());
         }
 
         @Test
         public void should_retrieve_empty_for_unbind_type() {
-            Optional<Component> component = config.getContext().get(Component.class);
+            Optional<Component> component = config.getContext().getType(Component.class);
 
             assertTrue(component.isEmpty());
         }
@@ -58,7 +58,7 @@ public class ContextTest {
 
             ParameterizedType type = new TypeLiteral<Provider<Component>>() {
             }.getType();
-            Provider<Component> provider = (Provider<Component>) config.getContext().get(type).get();
+            Provider<Component> provider = (Provider<Component>) config.getContext().getType(type).get();
 
             assertSame(instance, provider.get());
         }
@@ -70,7 +70,7 @@ public class ContextTest {
             config.bind(Component.class, instance);
             ParameterizedType type = new TypeLiteral<List<Component>>() {
             }.getType();
-            assertFalse(config.getContext().get(type).isPresent());
+            assertFalse(config.getContext().getType(type).isPresent());
         }
 
         abstract class TypeLiteral<T> {
@@ -235,13 +235,12 @@ public class ContextTest {
             assertTrue(exception.getDependencies().contains(AnotherDependency.class));
         }
 
-        // todo should not throw exception if cyclic dependency via provider
         @Test
         public void should_not_throw_exception_if_cyclic_dependency_via_provider() {
             config.bind(Component.class, ComponentInjectConstructor.class);
             config.bind(Dependency.class, CyclicDependencyProviderConstructor.class);
 
-            Optional<Component> instance = config.getContext().get(Component.class);
+            Optional<Component> instance = config.getContext().getType(Component.class);
             assertTrue(instance.isPresent());
         }
 

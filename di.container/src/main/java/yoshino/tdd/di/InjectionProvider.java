@@ -8,7 +8,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.BiFunction;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.Arrays.stream;
@@ -61,13 +60,6 @@ class InjectionProvider<T> implements ComponentProvider<T> {
     }
 
     @Override
-    public List<Class<?>> getDependencies() {
-        return concat(concat(stream(injectConstructor.getParameterTypes()), injectFields.stream().map(Field::getType)),
-            injectMethods.stream().flatMap(m -> stream(m.getParameterTypes())))
-            .toList();
-    }
-
-    @Override
     public List<Type> getDependencyTypes() {
         return concat(concat(stream(injectConstructor.getParameters()).map(Parameter::getParameterizedType),
                 injectFields.stream().map(Field::getGenericType)),
@@ -104,23 +96,16 @@ class InjectionProvider<T> implements ComponentProvider<T> {
         return result;
     }
 
-
     private static Object toDependency(Context context, Field field) {
-        Type type = field.getGenericType();
-        if (type instanceof ParameterizedType) {
-            return context.get((ParameterizedType) type).get();
-        }
-        return context.get((Class<?>) field.getType()).get();
+        return toDependency(context, field.getGenericType());
     }
 
     private static Object[] toDependencies(Context context, Executable constructor) {
-        return stream(constructor.getParameters()).map(p -> {
-            Type type = p.getParameterizedType();
-            if (type instanceof ParameterizedType) {
-                return context.get((ParameterizedType) type).get();
-            }
-            return context.get((Class<?>) p.getType()).get();
-        }).toArray(Object[]::new);
+        return stream(constructor.getParameters()).map(p -> toDependency(context, p.getParameterizedType())).toArray(Object[]::new);
+    }
+
+    private static Object toDependency(Context context, Type type) {
+        return context.getType(type).get();
     }
 
     private static boolean isOverrideByNoInjectMethod(Class<?> componentType, Method m) {
