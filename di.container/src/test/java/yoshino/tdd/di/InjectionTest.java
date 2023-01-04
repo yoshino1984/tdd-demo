@@ -5,6 +5,7 @@ import jakarta.inject.Provider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -21,14 +22,15 @@ import static org.mockito.Mockito.*;
 public class InjectionTest {
     private Dependency dependency = mock(Dependency.class);
     private Provider<Dependency> dependencyProvider = mock(Provider.class);
+    private ParameterizedType dependencyType;
 
     private Context context = mock(Context.class);
 
     @BeforeEach
     public void setUp() throws NoSuchFieldException {
-        Type type = InjectionTest.class.getDeclaredField("dependencyProvider").getGenericType();
+        dependencyType = (ParameterizedType) InjectionTest.class.getDeclaredField("dependencyProvider").getGenericType();
         when(context.get(eq(Dependency.class))).thenReturn(Optional.of(dependency));
-        when(context.get(eq((ParameterizedType) type))).thenReturn(Optional.of(dependencyProvider));
+        when(context.get(eq(dependencyType))).thenReturn(Optional.of(dependencyProvider));
     }
 
     @Nested
@@ -57,6 +59,13 @@ public class InjectionTest {
                 InjectionProvider<ComponentWithDependencyInjectedConstructor> provider = new InjectionProvider<>(ComponentWithDependencyInjectedConstructor.class);
 
                 assertArrayEquals(new Class<?>[]{Dependency.class}, provider.getDependencies().toArray());
+            }
+
+            @Test
+            public void should_include_dependency_type_via_inject_constructor() {
+                InjectionProvider<InjectProviderConstructor> provider = new InjectionProvider<>(InjectProviderConstructor.class);
+
+                assertArrayEquals(new Type[]{dependencyType}, provider.getDependencyTypes().toArray());
             }
 
             static class InjectProviderConstructor {
@@ -142,7 +151,12 @@ public class InjectionTest {
                 assertArrayEquals(new Class<?>[]{Dependency.class}, provider.getDependencies().toArray());
             }
 
-            // todo inject provider via inject field
+            @Test
+            public void should_include_dependency_type_via_inject_field() {
+                InjectionProvider<InjectProviderField> provider = new InjectionProvider<>(InjectProviderField.class);
+
+                assertArrayEquals(new Type[]{dependencyType}, provider.getDependencyTypes().toArray());
+            }
 
             static class InjectProviderField {
                 @Inject
@@ -269,6 +283,14 @@ public class InjectionTest {
                 InjectionProvider<InjectMethodWithDependency> provider = new InjectionProvider<>(InjectMethodWithDependency.class);
                 assertArrayEquals(new Class<?>[]{Dependency.class}, provider.getDependencies().toArray(Class<?>[]::new));
             }
+
+            @Test
+            public void should_include_dependency_type_via_inject_method() {
+                InjectionProvider<InjectProviderMethod> provider = new InjectionProvider<>(InjectProviderMethod.class);
+
+                assertArrayEquals(new Type[]{dependencyType}, provider.getDependencyTypes().toArray());
+            }
+
 
             static class InjectProviderMethod {
                 Provider<Dependency> dependencyProvider;

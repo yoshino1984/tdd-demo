@@ -67,6 +67,13 @@ class InjectionProvider<T> implements ComponentProvider<T> {
             .toList();
     }
 
+    @Override
+    public List<Type> getDependencyTypes() {
+        return concat(concat(stream(injectConstructor.getParameters()).map(Parameter::getParameterizedType),
+                injectFields.stream().map(Field::getGenericType)),
+            injectMethods.stream().flatMap(p -> stream(p.getParameters()).map(Parameter::getParameterizedType))).toList();
+    }
+
     private static <Type, Implementation extends Type> Constructor<?> getInjectConstructor(Class<Implementation> implementation) {
         List<Constructor<?>> injectedConstructors = injectable(implementation.getConstructors()).toList();
         if (injectedConstructors.size() > 1) {
@@ -81,8 +88,8 @@ class InjectionProvider<T> implements ComponentProvider<T> {
 
     private List<Method> getInjectMethods(Class<T> component) {
         List<Method> injectMethods = traverse(component, (methods, current) -> injectable(current.getDeclaredMethods())
-                    .filter(m -> isOverrideByInjectMethod(methods, m))
-                    .filter(m -> isOverrideByNoInjectMethod(component, m)).toList());
+            .filter(m -> isOverrideByInjectMethod(methods, m))
+            .filter(m -> isOverrideByNoInjectMethod(component, m)).toList());
         Collections.reverse(injectMethods);
         return injectMethods;
     }

@@ -1,6 +1,9 @@
 package yoshino.tdd.di;
 
+import java.lang.reflect.Type;
 import java.util.List;
+
+import static java.util.List.*;
 
 /**
  * @author xiaoyi
@@ -11,6 +14,9 @@ interface ComponentProvider<T> {
     T get(Context context);
 
     default List<Class<?>> getDependencies() {
-        return List.of();
+        return of();
+    }
+    default List<Type> getDependencyTypes() {
+        return of();
     }
 }

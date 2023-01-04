@@ -89,6 +89,13 @@
   - 注入构造函数中可以声明对于 Provider 的依赖
   - 注入字段中可以声明对于 Provider 的依赖
   - 注入方法中可以声明对于 Provider 的依赖
+> // todo cant find dependency via provider in inject constructor
+> // todo cant find dependency via provider in inject field
+> // todo cant find dependency via provider in inject method
+> // todo include dependency type from inject constructor
+> // todo include dependency type from inject field
+> // todo include dependency type from inject method
+> // todo should not throw exception if cyclic dependency via provider
 - 自定义 Qualifier 的依赖
   - 注册组件时，可额外指定是否为 Singleton
   - 注册组件时，可从类对象上提取 Singleton 标注

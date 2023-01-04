@@ -56,7 +56,8 @@ public class ContextTest {
             };
             config.bind(Component.class, instance);
 
-            ParameterizedType type = new TypeLiteral<Provider<Component>>() {}.getType();
+            ParameterizedType type = new TypeLiteral<Provider<Component>>() {
+            }.getType();
             Provider<Component> provider = (Provider<Component>) config.getContext().get(type).get();
 
             assertSame(instance, provider.get());
@@ -67,7 +68,8 @@ public class ContextTest {
             Component instance = new Component() {
             };
             config.bind(Component.class, instance);
-            ParameterizedType type = new TypeLiteral<List<Component>>() {}.getType();
+            ParameterizedType type = new TypeLiteral<List<Component>>() {
+            }.getType();
             assertFalse(config.getContext().get(type).isPresent());
         }
 
@@ -82,13 +84,58 @@ public class ContextTest {
     @Nested
     class DependencyCheck {
 
-        @Test
-        public void should_throw_exception_if_cant_find_dependency() {
-            config.bind(Component.class, ComponentWithDependencyInjectedConstructor.class);
+        @ParameterizedTest
+        @MethodSource
+        public void should_throw_exception_if_dependency_not_found(Class<? extends Component> type) {
+            config.bind(Component.class, type);
 
             DependencyNotFoundException exception = assertThrows(DependencyNotFoundException.class, () -> config.getContext());
 
             assertSame(exception.getInstance(), Dependency.class);
+        }
+
+        private static Stream<Arguments> should_throw_exception_if_dependency_not_found() {
+            return Stream.of(Arguments.of(Named.of("inject constructor", MissingDependencyConstructor.class)),
+                Arguments.of(Named.of("inject method", MissingDependencyMethod.class)),
+                Arguments.of(Named.of("inject field", MissingDependencyField.class)),
+                Arguments.of(Named.of("provider in inject constructor", MissingProviderDependencyConstructor.class)),
+                Arguments.of(Named.of("provider in inject field", MissingProviderDependencyField.class)),
+                Arguments.of(Named.of("provider in inject method", MissingProviderDependencyMethod.class)));
+        }
+
+
+        static class MissingDependencyConstructor implements Component {
+            @Inject
+            public MissingDependencyConstructor(Dependency dependency) {
+            }
+        }
+
+        static class MissingDependencyMethod implements Component {
+            @Inject
+            public void install(Dependency dependency) {
+            }
+        }
+
+        static class MissingDependencyField implements Component {
+            @Inject
+            private Dependency dependency;
+        }
+
+        static class MissingProviderDependencyConstructor implements Component {
+            @Inject
+            public MissingProviderDependencyConstructor(Provider<Dependency> dependency) {
+            }
+        }
+
+        static class MissingProviderDependencyField implements Component {
+            @Inject
+            private Provider<Dependency> dependency;
+        }
+
+        static class MissingProviderDependencyMethod implements Component {
+            @Inject
+            private void install(Provider<Dependency> dependency) {
+            }
         }
 
         @ParameterizedTest
@@ -120,7 +167,7 @@ public class ContextTest {
             return result.stream();
         }
 
-        class ComponentInjectConstructor implements Component {
+        static class ComponentInjectConstructor implements Component {
             private Dependency dependency;
 
             @Inject
@@ -186,6 +233,22 @@ public class ContextTest {
             assertTrue(exception.getDependencies().contains(Component.class));
             assertTrue(exception.getDependencies().contains(Dependency.class));
             assertTrue(exception.getDependencies().contains(AnotherDependency.class));
+        }
+
+        // todo should not throw exception if cyclic dependency via provider
+        @Test
+        public void should_not_throw_exception_if_cyclic_dependency_via_provider() {
+            config.bind(Component.class, ComponentInjectConstructor.class);
+            config.bind(Dependency.class, CyclicDependencyProviderConstructor.class);
+
+            Optional<Component> instance = config.getContext().get(Component.class);
+            assertTrue(instance.isPresent());
+        }
+
+        static class CyclicDependencyProviderConstructor implements Dependency {
+            @Inject
+            public CyclicDependencyProviderConstructor(Provider<Component> dependency) {
+            }
         }
     }
 
