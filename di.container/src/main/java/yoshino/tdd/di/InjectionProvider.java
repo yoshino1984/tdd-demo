@@ -3,10 +3,7 @@ package yoshino.tdd.di;
 import jakarta.inject.Inject;
 
 import java.lang.reflect.*;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.function.BiFunction;
 import java.util.stream.Stream;
 
@@ -60,10 +57,11 @@ class InjectionProvider<T> implements ComponentProvider<T> {
     }
 
     @Override
-    public List<Type> getDependencyTypes() {
+    public List<Context.Ref> getDependencyRefs() {
         return concat(concat(stream(injectConstructor.getParameters()).map(Parameter::getParameterizedType),
                 injectFields.stream().map(Field::getGenericType)),
-            injectMethods.stream().flatMap(p -> stream(p.getParameters()).map(Parameter::getParameterizedType))).toList();
+            injectMethods.stream().flatMap(p -> stream(p.getParameters()).map(Parameter::getParameterizedType)))
+            .map(Context.Ref::of).toList();
     }
 
     private static <Type, Implementation extends Type> Constructor<?> getInjectConstructor(Class<Implementation> implementation) {
@@ -105,7 +103,7 @@ class InjectionProvider<T> implements ComponentProvider<T> {
     }
 
     private static Object toDependency(Context context, Type type) {
-        return context.getType(type).get();
+        return context.get(Context.Ref.of(type)).get();
     }
 
     private static boolean isOverrideByNoInjectMethod(Class<?> componentType, Method m) {

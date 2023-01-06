@@ -1,6 +1,5 @@
 package yoshino.tdd.di;
 
-import java.lang.reflect.Type;
 import java.util.List;
 
 import static java.util.List.*;
@@ -13,7 +12,7 @@ import static java.util.List.*;
 interface ComponentProvider<T> {
     T get(Context context);
 
-    default List<Type> getDependencyTypes() {
+    default List<Context.Ref> getDependencyRefs() {
         return of();
     }
 }

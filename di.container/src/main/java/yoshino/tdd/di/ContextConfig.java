@@ -2,7 +2,6 @@ package yoshino.tdd.di;
 
 import jakarta.inject.Provider;
 
-import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.*;
 
@@ -29,62 +28,32 @@ public class ContextConfig {
         return new Context() {
 
             @Override
-            public Optional getType(Type type) {
-                if (isContainerType(type)) {
-                    return get((ParameterizedType) type);
+            public Optional<?> get(Ref ref) {
+                if (ref.isContainer()) {
+                    if (ref.getContainer() != Provider.class) {
+                        return Optional.empty();
+                    }
+                    return Optional.ofNullable(providers.get(ref.getComponent())).map(provider -> (Provider<Object>) () -> provider.get(this));
                 }
-                return get((Class<?>) type);
+                return Optional.ofNullable(providers.get(ref.getComponent())).map(it -> (Object) it.get(this));
             }
 
-            private <Type> Optional<Type> get(Class<Type> type) {
-                return Optional.ofNullable(providers.get(type)).map(it -> (Type) it.get(this));
-            }
-
-            private Optional get(ParameterizedType type) {
-                if (type.getRawType() != Provider.class) {
-                    return Optional.empty();
-                }
-                return Optional.ofNullable(providers.get(getComponentType(type))).map(provider -> (Provider<Object>) () -> provider.get(this));
-            }
         };
     }
 
     private void checkDependencies(Class<?> component, Stack<Class<?>> visiting) {
-        for (Type dependency : providers.get(component).getDependencyTypes()) {
-            if (dependency instanceof Class) {
-                checkComponentDependency((Class<?>) dependency, visiting);
+        for (Context.Ref dependency : providers.get(component).getDependencyRefs()) {
+            if (!providers.containsKey(dependency.getComponent())) {
+                throw new DependencyNotFoundException(dependency.getComponent());
             }
-            if (isContainerType(dependency)) {
-                checkContainerDependency(dependency);
+            if (!dependency.isContainer()) {
+                if (visiting.contains(dependency.getComponent())) {
+                    throw new CyclicDependenciesException(visiting);
+                }
+                visiting.push(dependency.getComponent());
+                checkDependencies(dependency.getComponent(), visiting);
+                visiting.pop();
             }
         }
     }
-
-    private void checkContainerDependency(Type dependency) {
-        Class<?> type = getComponentType(dependency);
-        if (!providers.containsKey(type)) {
-            throw new DependencyNotFoundException(type);
-        }
-    }
-
-    private static Class<?> getComponentType(Type dependency) {
-        return (Class<?>) ((ParameterizedType)dependency).getActualTypeArguments()[0];
-    }
-
-    private static boolean isContainerType(Type dependency) {
-        return dependency instanceof ParameterizedType;
-    }
-
-    private void checkComponentDependency(Class<?> dependency, Stack<Class<?>> visiting) {
-        if (!providers.containsKey(dependency)) {
-            throw new DependencyNotFoundException(dependency);
-        }
-        if (visiting.contains(dependency)) {
-            throw new CyclicDependenciesException(visiting);
-        }
-        visiting.push(dependency);
-        checkDependencies(dependency, visiting);
-        visiting.pop();
-    }
-
 }

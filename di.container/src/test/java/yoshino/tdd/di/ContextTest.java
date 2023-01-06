@@ -40,12 +40,12 @@ public class ContextTest {
 
             config.bind(Component.class, instance);
 
-            assertEquals(instance, config.getContext().getType(Component.class).get());
+            assertEquals(instance, config.getContext().get(Context.Ref.of(Component.class)).get());
         }
 
         @Test
         public void should_retrieve_empty_for_unbind_type() {
-            Optional<Component> component = config.getContext().getType(Component.class);
+            Optional<Component> component = config.getContext().get(Context.Ref.of(Component.class));
 
             assertTrue(component.isEmpty());
         }
@@ -56,9 +56,7 @@ public class ContextTest {
             };
             config.bind(Component.class, instance);
 
-            ParameterizedType type = new TypeLiteral<Provider<Component>>() {
-            }.getType();
-            Provider<Component> provider = (Provider<Component>) config.getContext().getType(type).get();
+            Provider<Component> provider = config.getContext().get(new Context.Ref<Provider<Component>>(){}).get();
 
             assertSame(instance, provider.get());
         }
@@ -68,15 +66,7 @@ public class ContextTest {
             Component instance = new Component() {
             };
             config.bind(Component.class, instance);
-            ParameterizedType type = new TypeLiteral<List<Component>>() {
-            }.getType();
-            assertFalse(config.getContext().getType(type).isPresent());
-        }
-
-        abstract class TypeLiteral<T> {
-            public ParameterizedType getType() {
-                return (ParameterizedType) ((ParameterizedType) getClass().getGenericSuperclass()).getActualTypeArguments()[0];
-            }
+            assertFalse(config.getContext().get(new Context.Ref<List<Component>>() {}).isPresent());
         }
 
     }
@@ -240,7 +230,7 @@ public class ContextTest {
             config.bind(Component.class, ComponentInjectConstructor.class);
             config.bind(Dependency.class, CyclicDependencyProviderConstructor.class);
 
-            Optional<Component> instance = config.getContext().getType(Component.class);
+            Optional<Component> instance = config.getContext().get(Context.Ref.of(Component.class));
             assertTrue(instance.isPresent());
         }
 
