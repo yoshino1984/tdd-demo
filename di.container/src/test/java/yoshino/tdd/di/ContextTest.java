@@ -7,6 +7,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import javax.naming.Name;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
 import java.util.List;
@@ -67,6 +69,83 @@ public class ContextTest {
             };
             config.bind(Component.class, instance);
             assertFalse(config.getContext().get(new Context.Ref<List<Component>>() {}).isPresent());
+        }
+
+        @Nested
+        public class WithQualifier {
+            @Test
+            public void should_bind_instance_with_qualifier() {
+                Component instance = new Component() {
+                };
+                config.bind(Component.class, instance, new NamedLiteral("choseOne"));
+
+                Context context = config.getContext();
+                Optional<Component> choseOne = context.get(Context.Ref.of(Component.class, new NamedLiteral("choseOne")));
+
+                assertTrue(choseOne.isPresent());
+                assertSame(instance, choseOne.get());
+
+            }
+
+            @Test
+            public void should_bind_component_with_qualifier() {
+                Dependency dependency = new Dependency() {
+                };
+                config.bind(Dependency.class, dependency);
+                config.bind(Component.class, ComponentWithDefaultConstructor.class, new NamedLiteral("choseOne"));
+
+
+                Context context = config.getContext();
+                Optional<Component> choseOne = context.get(Context.Ref.of(Component.class, new NamedLiteral("choseOne")));
+
+                assertTrue(choseOne.isPresent());
+                assertTrue(choseOne.get() instanceof ComponentWithDefaultConstructor);
+            }
+
+            @Test
+            public void should_bind_instance_with_multi_qualifier() {
+                Component instance = new Component() {
+                };
+                config.bind(Component.class, instance, new NamedLiteral("choseOne"), new NamedLiteral("skyWalker"));
+
+                Context context = config.getContext();
+                Optional<Component> choseOne = context.get(Context.Ref.of(Component.class, new NamedLiteral("choseOne")));
+                Optional<Component> skyWalker = context.get(Context.Ref.of(Component.class, new NamedLiteral("skyWalker")));
+
+                assertTrue(choseOne.isPresent());
+                assertTrue(skyWalker.isPresent());
+                assertSame(instance, choseOne.get());
+                assertSame(instance, skyWalker.get());
+            }
+
+            @Test
+            public void should_bind_component_with_multi_qualifier() {
+
+                Dependency dependency = new Dependency() {
+                };
+                config.bind(Dependency.class, dependency);
+                config.bind(Component.class, ComponentWithDefaultConstructor.class, new NamedLiteral("choseOne"), new NamedLiteral("skyWalker"));
+
+
+                Context context = config.getContext();
+                Optional<Component> choseOne = context.get(Context.Ref.of(Component.class, new NamedLiteral("choseOne")));
+                Optional<Component> skyWalker = context.get(Context.Ref.of(Component.class, new NamedLiteral("skyWalker")));
+
+                assertTrue(choseOne.isPresent());
+                assertTrue(skyWalker.isPresent());
+                assertTrue(choseOne.get() instanceof ComponentWithDefaultConstructor);
+                assertTrue(skyWalker.get() instanceof ComponentWithDefaultConstructor);
+            }
+
+            // todo throw illegal component if qualifier illegal
+        }
+
+        record NamedLiteral(String value) implements jakarta.inject.Named {
+
+            @Override
+            public Class<? extends Annotation> annotationType() {
+                return jakarta.inject.Named.class;
+            }
         }
 
     }

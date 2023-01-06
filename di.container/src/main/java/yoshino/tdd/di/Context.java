@@ -1,5 +1,6 @@
 package yoshino.tdd.di;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.Objects;
@@ -17,7 +18,10 @@ public interface Context {
     class Ref<ComponentType> {
 
         public static Ref of(Type type) {
-            return new Ref(type);
+            return new Ref(type, null);
+        }
+        public static <ComponentType> Ref<ComponentType> of(Class<ComponentType> type, Annotation qualifier) {
+            return new Ref<>(type, qualifier);
         }
 
         public static <ComponentType> Ref<ComponentType> of(Class<ComponentType> type) {
@@ -27,8 +31,11 @@ public interface Context {
         private Type container;
         private Class<?> component;
 
-        Ref(Type container) {
+        private Annotation qualifier;
+
+        Ref(Type container, Annotation qualifier) {
             init(container);
+            this.qualifier = qualifier;
         }
 
         Ref(Class<ComponentType> component) {
@@ -43,9 +50,9 @@ public interface Context {
         private void init(Type type) {
             if (type instanceof ParameterizedType container) {
                 this.container = container.getRawType();
-                this.component = (Class<?>) container.getActualTypeArguments()[0];
+                this.component = (Class<ComponentType>) container.getActualTypeArguments()[0];
             } else {
-                this.component = (Class<?>) type;
+                this.component = (Class<ComponentType>) type;
             }
         }
 
@@ -55,6 +62,10 @@ public interface Context {
 
         public Class<?> getComponent() {
             return component;
+        }
+
+        public Annotation getQualifier() {
+            return qualifier;
         }
 
         public boolean isContainer() {
