@@ -29,30 +29,28 @@ public interface Context {
         }
 
         private Type container;
-        private Class<?> component;
 
-        private Annotation qualifier;
+        private Component component;
 
         Ref(Type container, Annotation qualifier) {
-            init(container);
-            this.qualifier = qualifier;
+            init(container, qualifier);
         }
 
-        Ref(Class<ComponentType> component) {
-            init(component);
+        Ref(Class<ComponentType> type) {
+            init(type, null);
         }
 
         protected Ref() {
             Type type = ((ParameterizedType) getClass().getGenericSuperclass()).getActualTypeArguments()[0];
-            init(type);
+            init(type, null);
         }
 
-        private void init(Type type) {
+        private void init(Type type, Annotation qualifier) {
             if (type instanceof ParameterizedType container) {
                 this.container = container.getRawType();
-                this.component = (Class<ComponentType>) container.getActualTypeArguments()[0];
+                this.component = new Component((Class<ComponentType>) container.getActualTypeArguments()[0], qualifier);
             } else {
-                this.component = (Class<ComponentType>) type;
+                this.component = new Component((Class<ComponentType>) type, qualifier);
             }
         }
 
@@ -60,12 +58,12 @@ public interface Context {
             return container;
         }
 
-        public Class<?> getComponent() {
-            return component;
+        public Class<?> getComponentType() {
+            return component.type();
         }
 
-        public Annotation getQualifier() {
-            return qualifier;
+        public Component component() {
+            return component;
         }
 
         public boolean isContainer() {
@@ -76,7 +74,7 @@ public interface Context {
         public boolean equals(Object o) {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
-            Ref ref = (Ref) o;
+            Ref<?> ref = (Ref<?>) o;
             return Objects.equals(container, ref.container) && component.equals(ref.component);
         }
 

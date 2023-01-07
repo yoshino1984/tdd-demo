@@ -1,21 +1,7 @@
 package yoshino.tdd.di;
 
 import jakarta.inject.Inject;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
-
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.stream.Stream;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 
 public class ContainerTest {
@@ -37,7 +23,7 @@ public class ContainerTest {
 }
 
 
-interface Component {
+interface TestComponent {
 
 }
 
@@ -47,13 +33,13 @@ interface Dependency {
 interface AnotherDependency {
 }
 
-class ComponentWithDefaultConstructor implements Component {
+class ComponentWithDefaultConstructor implements TestComponent {
 
     public ComponentWithDefaultConstructor() {
     }
 }
 
-class ComponentWithDependencyInjectedConstructor implements Component {
+class ComponentWithDependencyInjectedConstructor implements TestComponent {
     private Dependency dependency;
 
     @Inject
@@ -66,7 +52,7 @@ class ComponentWithDependencyInjectedConstructor implements Component {
     }
 }
 
-class ComponentWithMultiInjectedConstructors implements Component {
+class ComponentWithMultiInjectedConstructors implements TestComponent {
 
     @Inject
     public ComponentWithMultiInjectedConstructors(String name) {
@@ -77,7 +63,7 @@ class ComponentWithMultiInjectedConstructors implements Component {
     }
 }
 
-class ComponentWithNoInjectedNorDefaultConstructor implements Component {
+class ComponentWithNoInjectedNorDefaultConstructor implements TestComponent {
 
     public ComponentWithNoInjectedNorDefaultConstructor(String name) {
     }
@@ -97,10 +83,10 @@ class DependencyWithDependencyInjected implements Dependency {
 }
 
 class DependencyDependedOnComponent implements Dependency {
-    private Component component;
+    private TestComponent component;
 
     @Inject
-    public DependencyDependedOnComponent(Component component) {
+    public DependencyDependedOnComponent(TestComponent component) {
         this.component = component;
     }
 }
@@ -115,10 +101,10 @@ class DependencyDependedOnAnotherDependency implements Dependency {
 }
 
 class AnotherDependencyDependedOnComponent implements AnotherDependency {
-    private Component component;
+    private TestComponent component;
 
     @Inject
-    public AnotherDependencyDependedOnComponent(Component component) {
+    public AnotherDependencyDependedOnComponent(TestComponent component) {
         this.component = component;
     }
 }
