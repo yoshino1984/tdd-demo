@@ -23,6 +23,7 @@ class InjectionProvider<T> implements ComponentProvider<T> {
     private List<Field> injectFields;
 
     private List<Method> injectMethods;
+    private List<ComponentRef> dependencies;
 
     public InjectionProvider(Class<T> componentType) {
         if (Modifier.isAbstract(componentType.getModifiers())) {
@@ -39,6 +40,7 @@ class InjectionProvider<T> implements ComponentProvider<T> {
         if (injectMethods.stream().anyMatch(it -> it.getTypeParameters().length > 0)) {
             throw new IllegalComponentException();
         }
+        this.dependencies = getDependencies();
     }
 
     @Override
@@ -60,15 +62,32 @@ class InjectionProvider<T> implements ComponentProvider<T> {
 
     @Override
     public List<ComponentRef> getDependencies() {
-        return concat(concat(stream(injectConstructor.getParameters()).map(p -> getOf(p)),
-                injectFields.stream().map(Field::getGenericType).map(ComponentRef::of)),
-            injectMethods.stream().flatMap(p -> stream(p.getParameters()).map(Parameter::getParameterizedType).map(ComponentRef::of)))
+        return concat(concat(stream(injectConstructor.getParameters()).map(InjectionProvider::toComponentRef),
+                injectFields.stream().map(f -> toComponentRef(f))),
+            injectMethods.stream().flatMap(p -> stream(p.getParameters()).map(InjectionProvider::toComponentRef)))
             .toList();
     }
 
-    private static ComponentRef<?> getOf(Parameter p) {
-        Annotation annotation = stream(p.getAnnotations()).filter(a -> a.annotationType().isAnnotationPresent(Qualifier.class)).findFirst().orElse(null);
-        return ComponentRef.of(p.getParameterizedType(), annotation);
+    private static ComponentRef toComponentRef(Field f) {
+        return ComponentRef.of(f.getGenericType(), getQualifier(f));
+    }
+
+
+    private static ComponentRef<?> toComponentRef(Parameter p) {
+        return ComponentRef.of(p.getParameterizedType(), getQualifier(p));
+    }
+
+    private static Annotation getQualifier(AnnotatedElement element) {
+        List<Annotation> qualifiers = getQualifiers(element);
+        if (qualifiers.size() > 1) {
+            throw new IllegalComponentException();
+        }
+        return qualifiers.stream().findFirst().orElse(null);
+    }
+
+    private static List<Annotation> getQualifiers(AnnotatedElement f) {
+        return stream(f.getAnnotations())
+            .filter(a -> a.annotationType().isAnnotationPresent(Qualifier.class)).toList();
     }
 
     private static <Type, Implementation extends Type> Constructor<?> getInjectConstructor(Class<Implementation> implementation) {
@@ -102,15 +121,15 @@ class InjectionProvider<T> implements ComponentProvider<T> {
     }
 
     private static Object toDependency(Context context, Field field) {
-        return toDependency(context, field.getGenericType());
+        return toDependency(context, field.getGenericType(), getQualifier(field));
     }
 
     private static Object[] toDependencies(Context context, Executable constructor) {
-        return stream(constructor.getParameters()).map(p -> toDependency(context, p.getParameterizedType())).toArray(Object[]::new);
+        return stream(constructor.getParameters()).map(p -> toDependency(context, p.getParameterizedType(), getQualifier(p))).toArray(Object[]::new);
     }
 
-    private static Object toDependency(Context context, Type type) {
-        return context.get(ComponentRef.of(type)).get();
+    private static Object toDependency(Context context, Type type, Annotation qualifier) {
+        return context.get(ComponentRef.of(type, qualifier)).get();
     }
 
     private static boolean isOverrideByNoInjectMethod(Class<?> componentType, Method m) {

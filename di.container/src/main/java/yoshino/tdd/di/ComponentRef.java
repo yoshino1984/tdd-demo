@@ -83,14 +83,4 @@ class ComponentRef<ComponentType> {
     public int hashCode() {
         return Objects.hash(container, component);
     }
-
-    // todo
-
-    @Override
-    public String toString() {
-        return "ComponentRef{" +
-            "container=" + container +
-            ", component=" + component +
-            '}';
-    }
 }

@@ -112,7 +112,6 @@ public class ContextTest {
                 assertTrue(skyWalker.get() instanceof ComponentWithDefaultConstructor);
             }
 
-            // todo throw illegal component if qualifier illegal
             @Test
             public void should_throw_exception_if_illegal_qualifier_given_to_instance() {
                 TestComponent instance = new TestComponent() {
@@ -127,8 +126,6 @@ public class ContextTest {
 
             // todo provider
         }
-
-
     }
 
     @Nested
@@ -302,7 +299,6 @@ public class ContextTest {
 
         @Nested
         public class WithQualifier {
-            // todo dependency missing if qualifier not match
             static class DependencyWithNamedQualifier {
                 @Inject
                 public DependencyWithNamedQualifier(@Skywalker Dependency dependency) {
