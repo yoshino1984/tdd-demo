@@ -7,15 +7,21 @@ package yoshino.tdd.di;
  **/
 
 public class DependencyNotFoundException extends RuntimeException {
-    public Class<?> getInstance() {
-        return instance;
+
+
+    private Component component;
+    private Component dependency;
+
+    public DependencyNotFoundException(Component component, Component dependency) {
+        this.component = component;
+        this.dependency = dependency;
     }
 
-    Class<?> instance;
-
-    public DependencyNotFoundException(Class<?> instance) {
-        this.instance = instance;
+    public Component getComponent() {
+        return component;
     }
 
-
+    public Component getDependency() {
+        return dependency;
+    }
 }

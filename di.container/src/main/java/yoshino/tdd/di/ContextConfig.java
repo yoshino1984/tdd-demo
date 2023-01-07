@@ -48,28 +48,28 @@ public class ContextConfig {
         return new Context() {
 
             @Override
-            public <ComponentType> Optional<ComponentType> get(Ref<ComponentType> ref) {
-                if (ref.isContainer()) {
-                    if (ref.getContainer() != Provider.class) {
+            public <ComponentType> Optional<ComponentType> get(ComponentRef<ComponentType> componentRef) {
+                if (componentRef.isContainer()) {
+                    if (componentRef.getContainer() != Provider.class) {
                         return Optional.empty();
                     }
-                    return (Optional<ComponentType>) Optional.ofNullable(components.get(ref.component())).map(provider -> (Provider<Object>) () -> provider.get(this));
+                    return (Optional<ComponentType>) Optional.ofNullable(components.get(componentRef.component())).map(provider -> (Provider<Object>) () -> provider.get(this));
                 }
-                return Optional.ofNullable(components.get(ref.component())).map(it -> (ComponentType) it.get(this));
+                return Optional.ofNullable(components.get(componentRef.component())).map(it -> (ComponentType) it.get(this));
             }
         };
     }
 
-    private void checkDependencies(Component component, Stack<Class<?>> visiting) {
-        for (Context.Ref dependency : components.get(component).getDependencies()) {
+    private void checkDependencies(Component component, Stack<Component> visiting) {
+        for (ComponentRef dependency : components.get(component).getDependencies()) {
             if (!components.containsKey(dependency.component())) {
-                throw new DependencyNotFoundException(dependency.getComponentType());
+                throw new DependencyNotFoundException(component, dependency.component());
             }
             if (!dependency.isContainer()) {
-                if (visiting.contains(dependency.getComponentType())) {
+                if (visiting.contains(dependency.component())) {
                     throw new CyclicDependenciesException(visiting);
                 }
-                visiting.push(dependency.getComponentType());
+                visiting.push(dependency.component());
                 checkDependencies(dependency.component(), visiting);
                 visiting.pop();
             }

@@ -1,7 +1,9 @@
 package yoshino.tdd.di;
 
 import jakarta.inject.Inject;
+import jakarta.inject.Qualifier;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.util.*;
 import java.util.function.BiFunction;
@@ -57,11 +59,16 @@ class InjectionProvider<T> implements ComponentProvider<T> {
     }
 
     @Override
-    public List<Context.Ref> getDependencies() {
-        return concat(concat(stream(injectConstructor.getParameters()).map(Parameter::getParameterizedType),
-                injectFields.stream().map(Field::getGenericType)),
-            injectMethods.stream().flatMap(p -> stream(p.getParameters()).map(Parameter::getParameterizedType)))
-            .map(Context.Ref::of).toList();
+    public List<ComponentRef> getDependencies() {
+        return concat(concat(stream(injectConstructor.getParameters()).map(p -> getOf(p)),
+                injectFields.stream().map(Field::getGenericType).map(ComponentRef::of)),
+            injectMethods.stream().flatMap(p -> stream(p.getParameters()).map(Parameter::getParameterizedType).map(ComponentRef::of)))
+            .toList();
+    }
+
+    private static ComponentRef<?> getOf(Parameter p) {
+        Annotation annotation = stream(p.getAnnotations()).filter(a -> a.annotationType().isAnnotationPresent(Qualifier.class)).findFirst().orElse(null);
+        return ComponentRef.of(p.getParameterizedType(), annotation);
     }
 
     private static <Type, Implementation extends Type> Constructor<?> getInjectConstructor(Class<Implementation> implementation) {
@@ -103,7 +110,7 @@ class InjectionProvider<T> implements ComponentProvider<T> {
     }
 
     private static Object toDependency(Context context, Type type) {
-        return context.get(Context.Ref.of(type)).get();
+        return context.get(ComponentRef.of(type)).get();
     }
 
     private static boolean isOverrideByNoInjectMethod(Class<?> componentType, Method m) {

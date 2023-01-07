@@ -3,6 +3,7 @@ package yoshino.tdd.di;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Stack;
+import java.util.stream.Collectors;
 
 /**
  * @author xiaoyi
@@ -11,26 +12,16 @@ import java.util.Stack;
  **/
 public class CyclicDependenciesException extends RuntimeException {
 
-    List<Class<?>> dependencies;
+    List<Component> components;
 
-    public CyclicDependenciesException(Class<?> dependencyType) {
-        dependencies = new ArrayList<>();
-        dependencies.add(dependencyType);
-    }
-    public CyclicDependenciesException(CyclicDependenciesException e, Class<?> componentType) {
-        dependencies = new ArrayList<>();
-        dependencies.addAll(e.getDependencies());
-        dependencies.add(componentType);
-    }
-
-    public CyclicDependenciesException(Stack<Class<?>> visiting) {
-        dependencies = new ArrayList<>();
-        dependencies.addAll(visiting);
+    public CyclicDependenciesException(Stack<Component> visiting) {
+        components = new ArrayList<>();
+        components.addAll(visiting);
     }
 
 
-    public List<Class<?>> getDependencies() {
-        return dependencies;
+    public List<Class<?>> getComponents() {
+        return components.stream().map(Component::type).collect(Collectors.toList());
     }
 
 }
