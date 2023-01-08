@@ -18,12 +18,9 @@ import static java.util.stream.Stream.concat;
  * @since
  **/
 class InjectionProvider<T> implements ComponentProvider<T> {
-    private Constructor<?> injectConstructor;
-
-    private List<Field> injectFields;
-
-    private List<Method> injectMethods;
-    private List<ComponentRef> dependencies;
+    private Injectable<Constructor<?>> injectConstructor;
+    private List<Injectable<Method>> injectMethods;
+    private List<Injectable<Field>> injectFields;
 
     public InjectionProvider(Class<T> componentType) {
         if (Modifier.isAbstract(componentType.getModifiers())) {
@@ -31,28 +28,29 @@ class InjectionProvider<T> implements ComponentProvider<T> {
         }
 
         this.injectConstructor = getInjectConstructor(componentType);
-        this.injectFields = getInjectFields(componentType);
         this.injectMethods = getInjectMethods(componentType);
+        this.injectFields = getInjectFields(componentType);
 
-        if (injectFields.stream().anyMatch(it -> Modifier.isFinal(it.getModifiers()))) {
+        if (injectFields.stream().map(Injectable::element).anyMatch(it -> Modifier.isFinal(it.getModifiers()))) {
             throw new IllegalComponentException();
         }
-        if (injectMethods.stream().anyMatch(it -> it.getTypeParameters().length > 0)) {
+        if (injectMethods.stream().map(Injectable::element).anyMatch(it -> it.getTypeParameters().length > 0)) {
             throw new IllegalComponentException();
         }
-        this.dependencies = getDependencies();
     }
 
     @Override
     public T get(Context context) {
         try {
-            T result = (T) injectConstructor.newInstance(toDependencies(context, injectConstructor));
-            for (Field field : injectFields) {
-                field.setAccessible(true);
-                field.set(result, toDependency(context, field));
+            T result = (T) injectConstructor.element().newInstance(injectConstructor.toDependencies(context));
+
+            for (Injectable<Field> field : injectFields) {
+                field.element().setAccessible(true);
+                field.element().set(result, field.toDependency(context));
             }
-            for (Method method : injectMethods) {
-                method.invoke(result, toDependencies(context, method));
+
+            for (Injectable<Method> method : injectMethods) {
+                method.element().invoke(result, method.toDependencies(context));
             }
             return result;
         } catch (InvocationTargetException | InstantiationException | IllegalAccessException e) {
@@ -61,53 +59,74 @@ class InjectionProvider<T> implements ComponentProvider<T> {
     }
 
     @Override
-    public List<ComponentRef> getDependencies() {
-        return concat(concat(stream(injectConstructor.getParameters()).map(InjectionProvider::toComponentRef),
-                injectFields.stream().map(f -> toComponentRef(f))),
-            injectMethods.stream().flatMap(p -> stream(p.getParameters()).map(InjectionProvider::toComponentRef)))
-            .toList();
+    public List<ComponentRef<?>> getDependencies() {
+        return concat(concat(Stream.of(injectConstructor), injectFields.stream()), injectMethods.stream())
+            .flatMap(m -> stream(m.required())).toList();
     }
 
-    private static ComponentRef toComponentRef(Field f) {
-        return ComponentRef.of(f.getGenericType(), getQualifier(f));
-    }
+    record Injectable<Element extends AccessibleObject>(Element element, ComponentRef<?>[] required) {
 
-
-    private static ComponentRef<?> toComponentRef(Parameter p) {
-        return ComponentRef.of(p.getParameterizedType(), getQualifier(p));
-    }
-
-    private static Annotation getQualifier(AnnotatedElement element) {
-        List<Annotation> qualifiers = getQualifiers(element);
-        if (qualifiers.size() > 1) {
-            throw new IllegalComponentException();
+        private static <T extends Executable> Injectable<T> of(T element) {
+            return new Injectable<>(element, stream(element.getParameters()).map(Injectable::toComponentRef).toArray(ComponentRef<?>[]::new));
         }
-        return qualifiers.stream().findFirst().orElse(null);
+
+        public static Injectable<Field> of(Field field) {
+            return new Injectable<>(field, new ComponentRef[]{toComponentRef(field)});
+        }
+
+        public Object[] toDependencies(Context context) {
+            return stream(required()).map(context::get).map(Optional::get).toArray(Object[]::new);
+        }
+
+        public Object toDependency(Context context) {
+            return context.get(required()[0]).get();
+        }
+
+        private static ComponentRef<?> toComponentRef(Field f) {
+            return ComponentRef.of(f.getGenericType(), getQualifier(f));
+        }
+
+        private static ComponentRef<?> toComponentRef(Parameter p) {
+            return ComponentRef.of(p.getParameterizedType(), getQualifier(p));
+        }
+
+        private static Annotation getQualifier(AnnotatedElement element) {
+            List<Annotation> qualifiers = stream(element.getAnnotations())
+                .filter(a -> a.annotationType().isAnnotationPresent(Qualifier.class)).toList();
+            if (qualifiers.size() > 1) {
+                throw new IllegalComponentException();
+            }
+            return qualifiers.stream().findFirst().orElse(null);
+        }
     }
 
-    private static List<Annotation> getQualifiers(AnnotatedElement f) {
-        return stream(f.getAnnotations())
-            .filter(a -> a.annotationType().isAnnotationPresent(Qualifier.class)).toList();
-    }
-
-    private static <Type, Implementation extends Type> Constructor<?> getInjectConstructor(Class<Implementation> implementation) {
-        List<Constructor<?>> injectedConstructors = injectable(implementation.getConstructors()).toList();
+    private static Injectable<Constructor<?>> getInjectConstructor(Class<?> componentType) {
+        List<Constructor<?>> injectedConstructors = injectable(componentType.getConstructors()).toList();
         if (injectedConstructors.size() > 1) {
             throw new IllegalComponentException();
         }
-        return injectedConstructors.stream().findFirst().orElseGet(() -> defaultConstructor(implementation));
+        return Injectable.of(injectedConstructors.stream().findFirst().orElseGet(() -> defaultConstructor(componentType)));
     }
 
-    private List<Field> getInjectFields(Class<T> componentType) {
-        return traverse(componentType, (injectFields1, current) -> injectable(current.getDeclaredFields()).toList());
-    }
-
-    private List<Method> getInjectMethods(Class<T> component) {
-        List<Method> injectMethods = traverse(component, (methods, current) -> injectable(current.getDeclaredMethods())
+    private List<Injectable<Method>> getInjectMethods(Class<T> componentType) {
+        List<Method> injectMethods = traverse(componentType, (methods, current) -> injectable(current.getDeclaredMethods())
             .filter(m -> isOverrideByInjectMethod(methods, m))
-            .filter(m -> isOverrideByNoInjectMethod(component, m)).toList());
+            .filter(m -> isOverrideByNoInjectMethod(componentType, m)).toList());
         Collections.reverse(injectMethods);
-        return injectMethods;
+        return injectMethods.stream().map(Injectable::of).toList();
+    }
+
+    private List<Injectable<Field>> getInjectFields(Class<T> componentType) {
+        List<Field> injectFields = traverse(componentType, (injectFields1, current) -> injectable(current.getDeclaredFields()).toList());
+        return injectFields.stream().map(Injectable::of).toList();
+    }
+
+    private static <Type, Implementation extends Type> Constructor<Implementation> defaultConstructor(Class<Implementation> implementation) {
+        try {
+            return implementation.getDeclaredConstructor();
+        } catch (NoSuchMethodException e) {
+            throw new IllegalComponentException();
+        }
     }
 
     private static <T> List<T> traverse(Class<?> componentType, BiFunction<List<T>, Class<?>, List<T>> finder) {
@@ -120,24 +139,12 @@ class InjectionProvider<T> implements ComponentProvider<T> {
         return result;
     }
 
-    private static Object toDependency(Context context, Field field) {
-        return toDependency(context, field.getGenericType(), getQualifier(field));
-    }
-
-    private static Object[] toDependencies(Context context, Executable constructor) {
-        return stream(constructor.getParameters()).map(p -> toDependency(context, p.getParameterizedType(), getQualifier(p))).toArray(Object[]::new);
-    }
-
-    private static Object toDependency(Context context, Type type, Annotation qualifier) {
-        return context.get(ComponentRef.of(type, qualifier)).get();
+    private static <T extends AnnotatedElement> Stream<T> injectable(T[] fields) {
+        return stream(fields).filter(it -> it.isAnnotationPresent(Inject.class));
     }
 
     private static boolean isOverrideByNoInjectMethod(Class<?> componentType, Method m) {
-        return isOverrideByNoInjectMethod(m, componentType.getDeclaredMethods());
-    }
-
-    private static boolean isOverrideByNoInjectMethod(Method m, Method[] declaredMethods) {
-        return stream(declaredMethods).filter(it -> !it.isAnnotationPresent(Inject.class)).noneMatch(it -> isOverride(m, it));
+        return stream(componentType.getDeclaredMethods()).filter(it -> !it.isAnnotationPresent(Inject.class)).noneMatch(it -> isOverride(m, it));
     }
 
     private static boolean isOverrideByInjectMethod(List<Method> result, Method m) {
@@ -148,15 +155,4 @@ class InjectionProvider<T> implements ComponentProvider<T> {
         return it.getName().equals(m.getName()) && Arrays.equals(it.getParameterTypes(), m.getParameterTypes());
     }
 
-    private static <T extends AnnotatedElement> Stream<T> injectable(T[] fields) {
-        return stream(fields).filter(it -> it.isAnnotationPresent(Inject.class));
-    }
-
-    private static <Type, Implementation extends Type> Constructor<Implementation> defaultConstructor(Class<Implementation> implementation) {
-        try {
-            return implementation.getDeclaredConstructor();
-        } catch (NoSuchMethodException e) {
-            throw new IllegalComponentException();
-        }
-    }
 }
