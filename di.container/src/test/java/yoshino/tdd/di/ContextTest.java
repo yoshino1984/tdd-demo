@@ -170,6 +170,29 @@ public class ContextTest {
                 assertEquals(PooledProvider.MAX, components.size());
             }
 
+            @Test
+            public void should_throw_exception_if_multi_scope_provided() {
+                assertThrows(IllegalComponentException.class, () -> config.bind(TestComponent.class, NotSingleton.class, new SingletonLiteral(), new PooledLiteral()));
+            }
+
+            @Singleton
+            @Pooled
+            static class MultiScopeAnnotated {
+
+            }
+
+            @Test
+            public void should_throw_exception_if_multi_scope_annotated() {
+                assertThrows(IllegalComponentException.class, () -> config.bind(MultiScopeAnnotated.class, MultiScopeAnnotated.class));
+            }
+
+            @Test
+            public void should_throw_exception_if_scope_provided_undefined() {
+                assertThrows(IllegalComponentException.class, () -> config.bind(NotSingleton.class, NotSingleton.class, new PooledLiteral()));
+            }
+
+
+
             @Nested
             public class WithQualifier {
                 @Test
