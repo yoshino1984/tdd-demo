@@ -4,9 +4,11 @@ import java.util.Optional;
 
 /**
  * @author xiaoyi
- * 2022/5/2 14:58
+ * 2022/12/31 12:26
  * @since
  **/
 public interface Context {
-    <T> Optional<T> get(Class<T> type);
+
+    <ComponentType> Optional<ComponentType> get(ComponentRef<ComponentType> componentRef);
+
 }

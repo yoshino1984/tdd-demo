@@ -71,12 +71,16 @@
   - 如果组件间存在循环依赖，则抛出异常
 - 字段注入
   - 通过 Inject 标注将字段声明为依赖组件
+  - 父类字段也需要注入
   - 如果组件需要的依赖不存在，则抛出异常
   - 如果字段为final则抛出异常
   - 如果组件间存在循环依赖，则抛出异常
 - 方法注入
   - 通过 Inject 标注的方法，其参数为依赖组件
   - 通过 Inject 标注的无参数方法，会被调用
+  - 父类中的 inject 也会被调用
+    子类override后（带inject 调用子类方法）
+    子类override后（不带inject 父子类方法都不调用）
   - 按照子类中的规则，覆盖父类中的 inject 方法
   - 如果组件需要的依赖不存在，则抛出异常
   - 如果方法定义类型参数(type parameter)，则抛出异常
@@ -85,6 +89,13 @@
   - 注入构造函数中可以声明对于 Provider 的依赖
   - 注入字段中可以声明对于 Provider 的依赖
   - 注入方法中可以声明对于 Provider 的依赖
+> // todo cant find dependency via provider in inject constructor
+> // todo cant find dependency via provider in inject field
+> // todo cant find dependency via provider in inject method
+> // todo include dependency type from inject constructor
+> // todo include dependency type from inject field
+> // todo include dependency type from inject method
+> // todo should not throw exception if cyclic dependency via provider
 - 自定义 Qualifier 的依赖
   - 注册组件时，可额外指定是否为 Singleton
   - 注册组件时，可从类对象上提取 Singleton 标注

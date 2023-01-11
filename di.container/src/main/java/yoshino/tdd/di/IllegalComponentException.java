@@ -1,9 +1,10 @@
-package yoshino.tdd.di.exception;
+package yoshino.tdd.di;
 
 /**
  * @author xiaoyi
- * 2022/5/1 19:55
+ * 2022/12/25 19:04
  * @since
  **/
+// todo redefine different exception
 public class IllegalComponentException extends RuntimeException {
 }
