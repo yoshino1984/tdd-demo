@@ -4,12 +4,15 @@
 
 
 ### Spike
-> POC 验证架构愿景，快速测试寻找代码结构
-1. Jetty demo
-2. ResourceServlet
-3. TestApplication
-4. TestMessageBodyWriter 
-5. TestProviders
+> POC 验证架构愿景，快速测试寻找代码结构 
+- Jetty 
+- ResourceServlet
+- Application
+- MessageBodyWriter 
+- Providers
+- di container
+  - application scope
+  - request scope
 
 
 
