@@ -4,8 +4,8 @@ import java.lang.annotation.Annotation;
 
 /**
  * @author xiaoyi
- * 2023/1/7 12:07
+ * 2023/1/13 00:13
  * @since
  **/
-record Component(Class<?> type, Annotation qualifier) {
+public record Component(Class<?> type, Annotation qualifier) {
 }

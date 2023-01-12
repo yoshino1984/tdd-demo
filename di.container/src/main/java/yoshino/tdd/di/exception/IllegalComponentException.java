@@ -1,4 +1,4 @@
-package yoshino.tdd.di;
+package yoshino.tdd.di.exception;
 
 /**
  * @author xiaoyi

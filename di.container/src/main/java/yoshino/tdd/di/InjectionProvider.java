@@ -2,6 +2,7 @@ package yoshino.tdd.di;
 
 import jakarta.inject.Inject;
 import jakarta.inject.Qualifier;
+import yoshino.tdd.di.exception.IllegalComponentException;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
