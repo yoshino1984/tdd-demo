@@ -29,20 +29,21 @@ public class ContextConfig {
     }
 
     public <Type> void instance(Class<Type> type, Type instance) {
-        bindInstance(type, instance);
+        bindInstance(type, instance, null);
     }
 
-    private void bindInstance(Class<?> type, Object instance) {
-        components.put(new Component(type, null), (ComponentProvider<?>) context -> instance);
-    }
 
     public <Type> void instance(Class<Type> type, Type instance, Annotation... qualifiers) {
         if (Arrays.stream(qualifiers).anyMatch(q -> !q.annotationType().isAnnotationPresent(Qualifier.class))) {
             throw new IllegalComponentException();
         }
         for (Annotation qualifier : qualifiers) {
-            components.put(new Component(type, qualifier), (ComponentProvider<Type>) context -> instance);
+            bindInstance(type, instance, qualifier);
         }
+    }
+
+    private void bindInstance(Class<?> type, Object instance, Annotation qualifier) {
+        components.put(new Component(type, qualifier), (ComponentProvider<?>) context -> instance);
     }
 
     public <Type, Implementation extends Type>
@@ -53,8 +54,11 @@ public class ContextConfig {
 
     public <Type, Implementation extends Type>
     void component(Class<Type> type, Class<Implementation> implementation, Annotation... annotations) {
-        Map<? extends Class<? extends Annotation>, List<Annotation>> annotationGroups
-            = Arrays.stream(annotations).collect(Collectors.groupingBy(this::typeOf, Collectors.toList()));
+        bindComponent(type, implementation, annotations);
+    }
+
+    private void bindComponent(Class<?> type, Class<?> implementation, Annotation... annotations) {
+        Map<? extends Class<? extends Annotation>, List<Annotation>> annotationGroups = Arrays.stream(annotations).collect(Collectors.groupingBy(this::typeOf, Collectors.toList()));
 
         if (annotationGroups.containsKey(Illegal.class)) {
             throw new IllegalComponentException();
@@ -155,7 +159,20 @@ public class ContextConfig {
                 for (Field field : fields) {
                     field.setAccessible(true);
                     Object value = field.get(config);
-                    ContextConfig.this.bindInstance(field.getType(), value);
+                    Class<?> type = Arrays.stream(field.getAnnotations()).filter(a -> a.annotationType() == Config.Export.class)
+                        .<Class<?>>map(a -> ((Config.Export) a).value()).findFirst()
+                        .orElse(field.getType());
+                    Annotation qualifier = Arrays.stream(field.getAnnotations()).filter(a -> a.annotationType().isAnnotationPresent(Qualifier.class))
+                        .findFirst().orElse(null);
+                    if (value != null) {
+                        ContextConfig.this.bindInstance(type, value, qualifier);
+                    } else {
+                        if (qualifier == null) {
+                            ContextConfig.this.bindComponent(type, field.getType());
+                        } else {
+                            ContextConfig.this.bindComponent(type, field.getType(), qualifier);
+                        }
+                    }
                 }
             } catch (Exception e) {
                 throw new RuntimeException(e);

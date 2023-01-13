@@ -450,6 +450,95 @@ public class ContextTest {
         }
     }
 
+    @Nested
+    class DSL {
+        interface Api {
+        }
+
+        static class Implementation implements Api {
+        }
+
+        @Test
+        public void should_bind_a_instance_via_dsl_config() {
+            Implementation instance = new Implementation();
+
+            config.from(new Config() {
+                Implementation implementation = instance;
+            });
+
+            Implementation component = config.getContext().get(ComponentRef.of(Implementation.class)).get();
+
+            assertSame(instance, component);
+        }
+
+        @Test
+        public void should_bind_a_component_via_dsl_config() {
+
+            config.from(new Config() {
+                Implementation implementation;
+            });
+
+            Implementation component = config.getContext().get(ComponentRef.of(Implementation.class)).get();
+
+            assertNotNull(component);
+        }
+
+        @Test
+        public void should_export_interface_with_instance_via_dsl_config() {
+            Implementation instance = new Implementation();
+
+            config.from(new Config() {
+                @Export(Api.class)
+                Implementation implementation = instance;
+            });
+
+            Api component = config.getContext().get(ComponentRef.of(Api.class)).get();
+
+            assertSame(instance, component);
+        }
+
+        @Test
+        public void should_export_interface_with_component_via_dsl_config() {
+
+            config.from(new Config() {
+                @Export(Api.class)
+                Implementation implementation;
+            });
+
+            Api component = config.getContext().get(ComponentRef.of(Api.class)).get();
+
+            assertNotNull(component);
+        }
+
+        @Test
+        public void should_bind_a_instance_with_qualifier_via_dsl_config() {
+            Implementation instance = new Implementation();
+
+            config.from(new Config() {
+                @Skywalker
+                Implementation implementation = instance;
+            });
+
+            Implementation component = config.getContext().get(ComponentRef.of(Implementation.class, new SkywalkerLiteral())).get();
+
+            assertSame(instance, component);
+        }
+
+        @Test
+        public void should_bind_a_component_with_qualifier_via_dsl_config() {
+
+            config.from(new Config() {
+                @Skywalker
+                Implementation implementation;
+            });
+
+            Implementation component = config.getContext().get(ComponentRef.of(Implementation.class, new SkywalkerLiteral())).get();
+
+            assertNotNull(component);
+        }
+
+    }
+
 }
 
 record NamedLiteral(String value) implements jakarta.inject.Named {
