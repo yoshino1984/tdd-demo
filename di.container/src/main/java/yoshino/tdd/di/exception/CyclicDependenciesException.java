@@ -1,4 +1,6 @@
-package yoshino.tdd.di;
+package yoshino.tdd.di.exception;
+
+import yoshino.tdd.di.Component;
 
 import java.util.ArrayList;
 import java.util.List;

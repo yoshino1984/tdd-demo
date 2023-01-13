@@ -4,8 +4,13 @@ import jakarta.inject.Provider;
 import jakarta.inject.Qualifier;
 import jakarta.inject.Scope;
 import jakarta.inject.Singleton;
+import yoshino.tdd.di.exception.CyclicDependenciesException;
+import yoshino.tdd.di.exception.DependencyNotFoundException;
+import yoshino.tdd.di.exception.IllegalComponentException;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
+import java.text.MessageFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -23,30 +28,37 @@ public class ContextConfig {
         scopes.put(Singleton.class, SingletonProvider::new);
     }
 
-    public <Type> void bind(Class<Type> type, Type instance) {
-        components.put(new Component(type, null), (ComponentProvider<Type>) context -> instance);
+    public <Type> void instance(Class<Type> type, Type instance) {
+        bindInstance(type, instance, null);
     }
 
-    public <Type> void bind(Class<Type> type, Type instance, Annotation... qualifiers) {
+
+    public <Type> void instance(Class<Type> type, Type instance, Annotation... qualifiers) {
         if (Arrays.stream(qualifiers).anyMatch(q -> !q.annotationType().isAnnotationPresent(Qualifier.class))) {
             throw new IllegalComponentException();
         }
         for (Annotation qualifier : qualifiers) {
-            components.put(new Component(type, qualifier), (ComponentProvider<Type>) context -> instance);
+            bindInstance(type, instance, qualifier);
         }
     }
 
-
-    public <Type, Implementation extends Type>
-    void bind(Class<Type> type, Class<Implementation> implementation) {
-        Annotation[] scopes = Arrays.stream(implementation.getAnnotations()).filter(a -> a.annotationType().isAnnotationPresent(Scope.class)).toArray(Annotation[]::new);
-        bind(type, implementation, scopes);
+    private void bindInstance(Class<?> type, Object instance, Annotation qualifier) {
+        components.put(new Component(type, qualifier), (ComponentProvider<?>) context -> instance);
     }
 
     public <Type, Implementation extends Type>
-    void bind(Class<Type> type, Class<Implementation> implementation, Annotation... annotations) {
-        Map<? extends Class<? extends Annotation>, List<Annotation>> annotationGroups
-            = Arrays.stream(annotations).collect(Collectors.groupingBy(this::typeOf, Collectors.toList()));
+    void component(Class<Type> type, Class<Implementation> implementation) {
+        Annotation[] scopes = Arrays.stream(implementation.getAnnotations()).filter(a -> a.annotationType().isAnnotationPresent(Scope.class)).toArray(Annotation[]::new);
+        component(type, implementation, scopes);
+    }
+
+    public <Type, Implementation extends Type>
+    void component(Class<Type> type, Class<Implementation> implementation, Annotation... annotations) {
+        bindComponent(type, implementation, annotations);
+    }
+
+    private void bindComponent(Class<?> type, Class<?> implementation, Annotation... annotations) {
+        Map<? extends Class<? extends Annotation>, List<Annotation>> annotationGroups = Arrays.stream(annotations).collect(Collectors.groupingBy(this::typeOf, Collectors.toList()));
 
         if (annotationGroups.containsKey(Illegal.class)) {
             throw new IllegalComponentException();
@@ -65,6 +77,10 @@ public class ContextConfig {
         }
     }
 
+    public void from(Config config) {
+        new DSL(config).bind();
+    }
+
     private <Type> ComponentProvider<?> createScopeProvider(Class<Type> implementation, List<Annotation> scopes) {
         if (scopes.size() > 1) {
             throw new IllegalComponentException();
@@ -78,7 +94,7 @@ public class ContextConfig {
         return Arrays.stream(implementation.getAnnotations()).filter(a -> a.annotationType().isAnnotationPresent(Scope.class)).findFirst();
     }
 
-    Class<? extends Annotation> typeOf(Annotation annotation) {
+    private Class<? extends Annotation> typeOf(Annotation annotation) {
         Class<? extends Annotation> type = annotation.annotationType();
         return Stream.of(Qualifier.class, Scope.class).filter(type::isAnnotationPresent).findFirst().orElse(Illegal.class);
     }
@@ -128,6 +144,77 @@ public class ContextConfig {
                 visiting.pop();
             }
         }
+    }
+
+    private class DSL {
+        private Config config;
+
+        public DSL(Config config) {
+            this.config = config;
+        }
+
+        public void bind() {
+            try {
+                List<Field> fields = Arrays.stream(config.getClass().getDeclaredFields()).toList();
+                for (Field field : fields) {
+                    field.setAccessible(true);
+                    Object value = field.get(config);
+                    Class<?> type = Arrays.stream(field.getAnnotations()).filter(a -> a.annotationType() == Config.Export.class)
+                        .<Class<?>>map(a -> ((Config.Export) a).value()).findFirst()
+                        .orElse(field.getType());
+                    Annotation qualifier = Arrays.stream(field.getAnnotations()).filter(a -> a.annotationType().isAnnotationPresent(Qualifier.class))
+                        .findFirst().orElse(null);
+                    if (value != null) {
+                        ContextConfig.this.bindInstance(type, value, qualifier);
+                    } else {
+                        if (qualifier == null) {
+                            ContextConfig.this.bindComponent(type, field.getType());
+                        } else {
+                            ContextConfig.this.bindComponent(type, field.getType(), qualifier);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                throw new RuntimeException(e);
+            }
+        }
+    }
+}
+
+class ContextConfigError extends Error {
+
+    public static ContextConfigError unsatisfiedResolution(Component component, Component dependency) {
+        return new ContextConfigError(MessageFormat.format("Unsatisfied resolution: {1} for {0}", component, dependency));
+    }
+
+    public static ContextConfigError circularDependencies(Collection<Component> path, Component circular) {
+        return new ContextConfigError(MessageFormat.format("Circular resolution: {0} -> [{1}]",
+            path.stream().map(Objects::toString).collect(Collectors.joining(" -> ")), circular));
+    }
+
+    public ContextConfigError(String message) {
+        super(message);
+    }
+}
+
+class ContextConfigException extends RuntimeException {
+
+    static ContextConfigException illegalAnnotation(Class<?> type, List<Annotation> annotations) {
+        return new ContextConfigException(MessageFormat.format("Unqualified annotations: {0} for {1}",
+            String.join(" , ", annotations.stream().map(Objects::toString).toList()), type));
+    }
+
+    static ContextConfigException unknownScope(Class<? extends Annotation> annotationType) {
+        return new ContextConfigException(MessageFormat.format("Unknown scope: {0}", annotationType));
+    }
+
+    static ContextConfigException duplicated(Class<? extends Annotation> annotationType) {
+        return new ContextConfigException(MessageFormat.format("Duplicated: {0}", annotationType));
+    }
+
+    public ContextConfigException(String message) {
+        super(message);
     }
 }
 

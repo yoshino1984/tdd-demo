@@ -3,11 +3,10 @@ package yoshino.tdd.di;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Provider;
-import jakarta.inject.Qualifier;
-import jdk.jfr.Name;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import yoshino.tdd.di.exception.IllegalComponentException;
 
 import java.lang.reflect.ParameterizedType;
 import java.util.Optional;
