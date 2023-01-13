@@ -175,6 +175,7 @@ public class ContextConfig {
                     }
                 }
             } catch (Exception e) {
+                e.printStackTrace();
                 throw new RuntimeException(e);
             }
         }
