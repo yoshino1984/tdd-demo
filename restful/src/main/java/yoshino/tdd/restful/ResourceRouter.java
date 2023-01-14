@@ -1,8 +1,8 @@
 package yoshino.tdd.restful;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.ws.rs.container.ResourceContext;
 
-import javax.servlet.http.HttpServletRequest;
 
 /**
  * @author xiaoyi

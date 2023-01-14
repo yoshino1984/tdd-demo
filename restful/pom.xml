@@ -11,9 +11,12 @@
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
+        <jakarta.ws.rs-api.version>3.1.0</jakarta.ws.rs-api.version>
         <jakarta.inject.version>2.0.1</jakarta.inject.version>
+        <mockito.version>4.5.1</mockito.version>
+        <mockito.version>4.5.1</mockito.version>
         <junit-jupiter.version>5.8.2</junit-jupiter.version>
-        <jetty.version>9.4.48.v20220622</jetty.version>
+        <jetty.version>11.0.13</jetty.version>
     </properties>
 
     <dependencies>
@@ -25,7 +28,7 @@
         <dependency>
             <groupId>jakarta.ws.rs</groupId>
             <artifactId>jakarta.ws.rs-api</artifactId>
-            <version>3.1.0</version>
+            <version>${jakarta.ws.rs-api.version}</version>
         </dependency>
 
         <dependency>
@@ -67,7 +70,7 @@
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
-            <version>4.3.1</version>
+            <version>${mockito.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
