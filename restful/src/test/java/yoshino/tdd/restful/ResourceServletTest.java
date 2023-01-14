@@ -118,8 +118,41 @@ public class ResourceServletTest extends ServletTest {
         assertEquals(Response.Status.FORBIDDEN.getStatusCode(), httpResponse.statusCode());
     }
 
-    // todo 500 if MessageBodyWriter not found
-    // todo entity is null, ignore MessageBodyWriter
+    @Test
+    public void should_not_call_message_body_writerif_entity_is_null() throws Exception {
+        response.entity(null, new Annotation[0]).mediaType(MediaType.TEXT_PLAIN_TYPE).buildReturn(router);
+
+        HttpResponse<String> httpResponse = get("test");
+
+        assertEquals(Response.Status.OK.getStatusCode(), httpResponse.statusCode());
+        assertEquals("", httpResponse.body());
+    }
+
+    // todo 500 MessageBodyWriter not found
+    // todo 500 exception mapper not found
+    // todo 500 HeaderDelegate not found
+
+    // todo exception mapper handle web application
+    @Test
+    public void should_use_response_from_web_application_thrown_by_exception_mapper() throws Exception {
+
+        when(router.dispatch(any(), eq(resourceContext))).thenThrow(RuntimeException.class);
+
+        when(providers.getExceptionMapper(RuntimeException.class)).thenReturn(exception -> {
+            throw new WebApplicationException(response.status(Response.Status.FORBIDDEN).build());
+        });
+
+        HttpResponse<String> httpResponse = get("test");
+
+        assertEquals(Response.Status.FORBIDDEN.getStatusCode(), httpResponse.statusCode());
+    }
+
+    // todo providers gets exception mapper
+    // todo runtime delegate
+    // todo header delegate
+    // todo providers gets message body writer
+    // todo message body writer write
+
     class OutboundResponseBuilder {
         private Response.Status status = Response.Status.OK;
         private MultivaluedHashMap<String, Object> headers = new MultivaluedHashMap<>();

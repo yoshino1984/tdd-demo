@@ -9,42 +9,59 @@ import jakarta.ws.rs.core.GenericEntity;
 import jakarta.ws.rs.core.MultivaluedMap;
 import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.MessageBodyWriter;
+import jakarta.ws.rs.ext.Providers;
+import jakarta.ws.rs.ext.RuntimeDelegate;
 
 import java.io.IOException;
-import java.lang.annotation.Annotation;
+import java.util.function.Supplier;
 
 public class ResourceServlet extends HttpServlet {
 
     private Runtime runtime;
 
+    private Providers providers;
+
     public ResourceServlet(Runtime runtime) {
         this.runtime = runtime;
+        this.providers = runtime.getProviders();
     }
 
     @Override
     protected void service(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         ResourceRouter router = runtime.createResourceRouter();
 
-        OutboundResponse response;
-        try {
-            response = router.dispatch(req, runtime.createResourceContext(req, resp));
-        } catch (WebApplicationException e) {
-            response = (OutboundResponse) e.getResponse();
-        } catch (Throwable throwable) {
-            ExceptionMapper mapper = runtime.getProviders().getExceptionMapper(throwable.getClass());
-            response = (OutboundResponse) mapper.toResponse(throwable);
-        }
+        respond(resp, () -> router.dispatch(req, runtime.createResourceContext(req, resp)));
+    }
 
+    private void respond(HttpServletResponse resp, Supplier<OutboundResponse> supplier) throws IOException {
+        try {
+            respond(resp, supplier.get());
+        } catch (WebApplicationException exception) {
+            respond(resp, () -> (OutboundResponse) exception.getResponse());
+        } catch (Throwable throwable) {
+            respond(resp, () -> from(throwable));
+        }
+    }
+
+    private OutboundResponse from(Throwable throwable) {
+        ExceptionMapper mapper = providers.getExceptionMapper(throwable.getClass());
+        return (OutboundResponse) mapper.toResponse(throwable);
+    }
+
+    private void respond(HttpServletResponse resp, OutboundResponse response) throws IOException {
         resp.setStatus(response.getStatus());
         MultivaluedMap<String, Object> headers = response.getHeaders();
         for (String name : headers.keySet()) {
             for (Object value : headers.get(name)) {
-                resp.addHeader(name, value.toString());
+                RuntimeDelegate.HeaderDelegate headerDelegate = RuntimeDelegate.getInstance().createHeaderDelegate(value.getClass());
+                resp.addHeader(name, headerDelegate.toString(value));
             }
         }
 
         GenericEntity entity = response.getGenericEntity();
-        MessageBodyWriter writer = runtime.getProviders().getMessageBodyWriter(entity.getRawType(), entity.getType(), response.getAnnotations(), response.getMediaType());
-        writer.writeTo(entity.getEntity(), entity.getRawType(), entity.getType(), response.getAnnotations(), response.getMediaType(), headers, resp.getOutputStream());
+        if (entity != null) {
+            MessageBodyWriter writer = providers.getMessageBodyWriter(entity.getRawType(), entity.getType(), response.getAnnotations(), response.getMediaType());
+            writer.writeTo(entity.getEntity(), entity.getRawType(), entity.getType(), response.getAnnotations(), response.getMediaType(), headers, resp.getOutputStream());
+        }
     }
 }
