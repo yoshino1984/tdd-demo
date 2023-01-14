@@ -4,9 +4,12 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.ws.rs.core.GenericEntity;
 import jakarta.ws.rs.core.MultivaluedMap;
+import jakarta.ws.rs.ext.MessageBodyWriter;
 
 import java.io.IOException;
+import java.lang.annotation.Annotation;
 
 public class ResourceServlet extends HttpServlet {
 
@@ -27,5 +30,9 @@ public class ResourceServlet extends HttpServlet {
                 resp.addHeader(name, value.toString());
             }
         }
+
+        GenericEntity entity = response.getGenericEntity();
+        MessageBodyWriter writer = runtime.getProviders().getMessageBodyWriter(entity.getRawType(), entity.getType(), response.getAnnotations(), response.getMediaType());
+        writer.writeTo(entity.getEntity(), entity.getRawType(), entity.getType(), response.getAnnotations(), response.getMediaType(), headers, resp.getOutputStream());
     }
 }
