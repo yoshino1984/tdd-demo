@@ -1,8 +1,11 @@
 package yoshino.tdd.restful;
 
+import jakarta.inject.Inject;
+import jakarta.inject.Named;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.container.ResourceContext;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.MultivaluedMap;
 import jakarta.ws.rs.ext.*;
@@ -36,6 +39,10 @@ import java.util.Set;
 import java.util.stream.Stream;
 
 import jakarta.ws.rs.core.Application;
+import yoshino.tdd.di.ComponentRef;
+import yoshino.tdd.di.Config;
+import yoshino.tdd.di.Context;
+import yoshino.tdd.di.ContextConfig;
 
 public class ASpike {
     Server server;
@@ -47,7 +54,7 @@ public class ASpike {
         server.addConnector(connector);
 
         ServletContextHandler handler = new ServletContextHandler(server, "/");
-        Application application = new TestApplication();
+        TestApplication application = new TestApplication();
         handler.addServlet(new ServletHolder(new ResourceServlet(application, new TestProviders(application))), "/");
         server.setHandler(handler);
 
@@ -66,35 +73,38 @@ public class ASpike {
         HttpRequest request = HttpRequest.newBuilder(new URI("http://localhost:8080/")).GET().build();
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
-        Assertions.assertEquals("test", response.body());
+        Assertions.assertEquals("prefixprefixtest", response.body());
     }
 
     static class ResourceServlet extends HttpServlet {
 
-        private Application application;
+        private final Context context;
+        private TestApplication application;
 
         private Providers providers;
 
-        ResourceServlet(Application application, Providers providers) {
+        ResourceServlet(TestApplication application, Providers providers) {
             this.application = application;
             this.providers = providers;
+            this.context = application.getContext();
         }
 
         @Override
         protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
             Stream<Class<?>> rootResource = application.getClasses().stream().filter(c -> c.isAnnotationPresent(Path.class));
 
-            Object result = dispatch(req, rootResource);
+            ResourceContext rc = application.createResourceContext(req, resp);
+            Object result = dispatch(req, rootResource, rc);
 
             MessageBodyWriter<Object> writer = (MessageBodyWriter<Object>) providers.getMessageBodyWriter(result.getClass(), null, null, null);
 
             writer.writeTo(result, null, null, null, null, null, resp.getOutputStream());
         }
 
-        private Object dispatch(HttpServletRequest req, Stream<Class<?>> rootResources) {
+        private Object dispatch(HttpServletRequest req, Stream<Class<?>> rootResources, ResourceContext rc) {
             try {
                 Class<?> rootClass = rootResources.findFirst().get();
-                Object rootResource = rootClass.getConstructor().newInstance();
+                Object rootResource = rc.initResource(context.get(ComponentRef.of(rootClass)).get());
                 Method method = Arrays.stream(rootResource.getClass().getDeclaredMethods()).filter(m -> m.isAnnotationPresent(GET.class)).findFirst().get();
                 return method.invoke(rootResource);
             } catch (Exception e) {
@@ -106,18 +116,14 @@ public class ASpike {
     static class TestProviders implements Providers {
 
         private final List<MessageBodyWriter> writers;
-        private Application application;
+        private TestApplication application;
 
-        public TestProviders(Application application) {
+        public TestProviders(TestApplication application) {
             this.application = application;
-            this.writers = (List<MessageBodyWriter>) application.getClasses().stream().filter(MessageBodyWriter.class::isAssignableFrom)
-                .map(c -> {
-                    try {
-                        return c.getConstructor().newInstance();
-                    } catch (Exception e) {
-                        throw new RuntimeException(e);
-                    }
-                }).toList();
+
+            List<Class<?>> rootClasses = application.getClasses().stream().filter(MessageBodyWriter.class::isAssignableFrom).toList();
+
+            this.writers = (List<MessageBodyWriter>) rootClasses.stream().map(c -> application.getContext().get(ComponentRef.of(c)).get()).toList();
         }
 
         @Override
@@ -141,9 +147,13 @@ public class ASpike {
         }
     }
 
-    static class TestMessageBodyWriter implements MessageBodyWriter<String> {
+    static class StringMessageBodyWriter implements MessageBodyWriter<String> {
 
-        public TestMessageBodyWriter() {
+        @Named("prefix")
+        @Inject
+        private String prefix;
+
+        public StringMessageBodyWriter() {
         }
 
         @Override
@@ -153,27 +163,65 @@ public class ASpike {
 
         @Override
         public void writeTo(String s, Class<?> aClass, Type type, Annotation[] annotations, MediaType mediaType, MultivaluedMap<String, Object> multivaluedMap, OutputStream outputStream) throws IOException, WebApplicationException {
+
             PrintWriter writer = new PrintWriter(outputStream);
-            writer.write(s);
+            writer.write(prefix + s);
             writer.flush();
         }
     }
 
     static class TestApplication extends Application {
+        private Context context;
+
+        public TestApplication() {
+            ContextConfig config = new ContextConfig();
+            config.from(getConfig());
+            List<Class<?>> rootClasses = this.getClasses().stream().filter(MessageBodyWriter.class::isAssignableFrom).toList();
+            for (Class rootClass : rootClasses) {
+                config.component(rootClass, rootClass);
+            }
+
+            List<Class<?>> resourceClasses = this.getClasses().stream().filter(c -> c.isAnnotationPresent(Path.class)).toList();
+            for (Class resourceClass : resourceClasses) {
+                config.component(resourceClass, resourceClass);
+            }
+            context = config.getContext();
+        }
+
+        public Config getConfig() {
+            return new Config() {
+                @Named("prefix")
+                private String prefix = "prefix";
+            };
+        }
+
         @Override
         public Set<Class<?>> getClasses() {
-            return Set.of(TestResource.class, TestMessageBodyWriter.class);
+            return Set.of(TestResource.class, StringMessageBodyWriter.class);
+        }
+
+        public Context getContext() {
+            return context;
+        }
+
+        public ResourceContext createResourceContext(HttpServletRequest req, HttpServletResponse resp) {
+            return null;
         }
     }
 
     @Path("/")
     static class TestResource {
+
+        @Named("prefix")
+        @Inject
+        String prefix;
+
         public TestResource() {
         }
 
         @GET
         public String get() {
-            return "test";
+            return prefix + "test";
         }
     }
 
