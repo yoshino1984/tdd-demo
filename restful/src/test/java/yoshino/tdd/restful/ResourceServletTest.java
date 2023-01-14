@@ -16,6 +16,7 @@ import java.io.PrintWriter;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Type;
 import java.net.http.HttpResponse;
+import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -33,6 +34,7 @@ public class ResourceServletTest extends ServletTest {
     private ResourceRouter router;
     private ResourceContext resourceContext;
     private Providers providers;
+    private OutboundResponseBuilder response;
 
     @Override
     protected Servlet getServlet() {
@@ -50,6 +52,7 @@ public class ResourceServletTest extends ServletTest {
 
     @BeforeEach
     public void before() {
+        response = new OutboundResponseBuilder();
         RuntimeDelegate runtimeDelegate = mock(RuntimeDelegate.class);
         RuntimeDelegate.setInstance(runtimeDelegate);
 
@@ -69,7 +72,7 @@ public class ResourceServletTest extends ServletTest {
 
     @Test
     public void should_use_status_code_from_response() throws Exception {
-        new OutboundResponseBuilder().status(Response.Status.NOT_MODIFIED).build(router);
+        response.status(Response.Status.NOT_MODIFIED).buildReturn(router);
 
         HttpResponse<String> httpResponse = get("/test");
 
@@ -78,8 +81,8 @@ public class ResourceServletTest extends ServletTest {
 
     @Test
     public void should_use_http_headers_from_response() throws Exception {
-        new OutboundResponseBuilder().headers("Set-Cookie", new NewCookie.Builder("SESSION_ID").value("session").build(),
-            new NewCookie.Builder("USER_ID").value("user").build()).build(router);
+        response.headers("Set-Cookie", new NewCookie.Builder("SESSION_ID").value("session").build(),
+            new NewCookie.Builder("USER_ID").value("user").build()).buildReturn(router);
 
         HttpResponse<String> httpResponse = get("test");
 
@@ -88,18 +91,35 @@ public class ResourceServletTest extends ServletTest {
 
     @Test
     public void should_write_entity_to_http_body_using_message_body_writer() throws Exception {
-        new OutboundResponseBuilder().entity(new GenericEntity<String>("entity", String.class), new Annotation[0]).mediaType(MediaType.TEXT_PLAIN_TYPE).build(router);
+        response.entity(new GenericEntity<>("entity", String.class), new Annotation[0]).mediaType(MediaType.TEXT_PLAIN_TYPE).buildReturn(router);
 
         HttpResponse<String> httpResponse = get("test");
 
         assertEquals("entity", httpResponse.body());
     }
 
-    // todo 500 if MessageBodyWriter not found
-    // todo throw WebApplicationException with response, use response
-    // todo throw WebApplicationException with null response, use ExceptionMapper build message
-    // todo throw other exception, use ExceptionMapper build message
+    @Test
+    public void should_use_response_from_web_application_exception() throws Exception {
+        response.status(Response.Status.FORBIDDEN).buildThrow(router);
 
+        HttpResponse<String> httpResponse = get("test");
+
+        assertEquals(Response.Status.FORBIDDEN.getStatusCode(), httpResponse.statusCode());
+    }
+
+    @Test
+    public void should_build_response_by_exception_mapper_if_not_web_application_exception() throws Exception {
+        when(router.dispatch(any(), eq(resourceContext))).thenThrow(RuntimeException.class);
+
+        when(providers.getExceptionMapper(RuntimeException.class)).thenReturn(exception -> response.status(Response.Status.FORBIDDEN).build());
+
+        HttpResponse<String> httpResponse = get("test");
+
+        assertEquals(Response.Status.FORBIDDEN.getStatusCode(), httpResponse.statusCode());
+    }
+
+    // todo 500 if MessageBodyWriter not found
+    // todo entity is null, ignore MessageBodyWriter
     class OutboundResponseBuilder {
         private Response.Status status = Response.Status.OK;
         private MultivaluedHashMap<String, Object> headers = new MultivaluedHashMap<>();
@@ -128,16 +148,36 @@ public class ResourceServletTest extends ServletTest {
             return this;
         }
 
-        public void build(ResourceRouter router) {
+        public void buildReturn(ResourceRouter router) {
+            build(response -> when(router.dispatch(any(), eq(resourceContext))).thenReturn(response));
+        }
+
+        public void buildThrow(ResourceRouter router) {
+            build(response -> {
+                WebApplicationException exception = new WebApplicationException(response);
+                when(router.dispatch(any(), eq(resourceContext))).thenThrow(exception);
+            });
+        }
+
+        private void build(Consumer<OutboundResponse> consumer) {
+            consumer.accept(build());
+        }
+
+        public OutboundResponse build() {
             OutboundResponse response = mock(OutboundResponse.class);
             when(response.getStatus()).thenReturn(status.getStatusCode());
+            when(response.getStatusInfo()).thenReturn(status);
             when(response.getHeaders()).thenReturn(headers);
             when(response.getGenericEntity()).thenReturn(entity);
             when(response.getAnnotations()).thenReturn(annotations);
             when(response.getMediaType()).thenReturn(mediaType);
-            when(router.dispatch(any(), eq(resourceContext))).thenReturn(response);
 
+            stubMessageBodyWriter();
 
+            return response;
+        }
+
+        private void stubMessageBodyWriter() {
             when(providers.getMessageBodyWriter(eq(String.class), eq(String.class), same(annotations), eq(mediaType))).thenReturn(new MessageBodyWriter<>() {
                 @Override
                 public boolean isWriteable(Class<?> type, Type genericType, Annotation[] annotations, MediaType mediaType) {
