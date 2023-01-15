@@ -4,7 +4,6 @@ import jakarta.servlet.Servlet;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.container.ResourceContext;
 import jakarta.ws.rs.core.*;
-import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.MessageBodyWriter;
 import jakarta.ws.rs.ext.Providers;
 import jakarta.ws.rs.ext.RuntimeDelegate;
@@ -193,71 +192,74 @@ public class ResourceServletTest extends ServletTest {
 
     @Test
     public void should_use_response_from_web_application_thrown_by_exceptionMapper_toResponse() {
-        WebApplicationException exception = new WebApplicationException(response().status(Response.Status.FORBIDDEN).build());
-
-        when(router.dispatch(any(), eq(resourceContext))).thenThrow(IllegalArgumentException.class);
-
-        when(providers.getExceptionMapper(IllegalArgumentException.class)).thenReturn(e -> {
-            throw exception;
-        });
-
-        HttpResponse<String> httpResponse = get("test");
-
-        assertEquals(Response.Status.FORBIDDEN.getStatusCode(), httpResponse.statusCode());
+        webApplicationExceptionThrowFrom(this::exceptionMapper_toResponse);
     }
 
     @Test
     public void should_handle_exception_thrown_by_exceptionMapper_toResponse() {
-        when(router.dispatch(any(), eq(resourceContext))).thenThrow(IllegalArgumentException.class);
-
-        when(providers.getExceptionMapper(IllegalArgumentException.class)).thenReturn(exception -> {
-            throw new RuntimeException();
-        });
-
-        when(providers.getExceptionMapper(RuntimeException.class)).thenReturn(exception -> response().status(Response.Status.FORBIDDEN).entity(null, new Annotation[0]).build());
-
-        HttpResponse<String> httpResponse = get("test");
-
-        assertEquals(Response.Status.FORBIDDEN.getStatusCode(), httpResponse.statusCode());
+        otherExceptionsThrowFrom(this::exceptionMapper_toResponse);
     }
 
     @Test
     public void should_use_response_from_web_application_exception_thrown_by_by_runtimeDelegate_createHeaderDelegate() {
-        WebApplicationException exception = new WebApplicationException(response().status(Response.Status.FORBIDDEN).build());
-
-        response().headers("Set-Cookie", new NewCookie.Builder("SESSION_ID").value("session").build(),
-            new NewCookie.Builder("USER_ID").value("user").build()).returnFrom(router);
-
-        when(runtimeDelegate.createHeaderDelegate(NewCookie.class)).thenThrow(exception);
-
-        HttpResponse<String> httpResponse = get("/test");
-
-        assertEquals(Response.Status.FORBIDDEN.getStatusCode(), httpResponse.statusCode());
+        webApplicationExceptionThrowFrom(this::runtimeDelegate_createHeaderDelegate);
     }
 
     @Test
     public void should_handle_exception_thrown_by_runtimeDelegate_createHeaderDelegate() {
-        response().headers("Set-Cookie", new NewCookie.Builder("SESSION_ID").value("session").build(),
-            new NewCookie.Builder("USER_ID").value("user").build()).returnFrom(router);
-
-        when(runtimeDelegate.createHeaderDelegate(NewCookie.class)).thenThrow(IllegalArgumentException.class);
-
-        when(providers.getExceptionMapper(eq(IllegalArgumentException.class)))
-            .thenReturn(exception -> response().status(Response.Status.FORBIDDEN).entity(null, new Annotation[0]).build());
-
-        HttpResponse<String> httpResponse = get("/test");
-
-        assertEquals(Response.Status.FORBIDDEN.getStatusCode(), httpResponse.statusCode());
+        otherExceptionsThrowFrom(this::runtimeDelegate_createHeaderDelegate);
     }
 
     @Test
     public void should_use_response_from_web_application_exception_thrown_by_headerDelegate_toString() {
-        WebApplicationException exception = new WebApplicationException(response().status(Response.Status.FORBIDDEN).build());
+        webApplicationExceptionThrowFrom(this::headerDelegate_toString);
+    }
 
+    @Test
+    public void should_handle_exception_thrown_by_headerDelegate_toString() {
+        otherExceptionsThrowFrom(this::headerDelegate_toString);
+    }
+
+    @Test
+    public void web_application_exception_thrown_from_providers_getMessageBodyWriter() {
+        webApplicationExceptionThrowFrom(this::providers_getMessageBodyWriter);
+    }
+
+    @Test
+    public void web_application_exception_thrown_from_messageBodyWriter_writeTo() {
+        webApplicationExceptionThrowFrom(this::messageBodyWriter_writeTo);
+    }
+
+    @Test
+    public void other_exception_thrown_from_providers_getMessageBodyWriter() {
+        otherExceptionsThrowFrom(this::providers_getMessageBodyWriter);
+    }
+
+    @Test
+    public void other_exception_thrown_from_messageBodyWriter_writeTo() {
+        otherExceptionsThrowFrom(this::messageBodyWriter_writeTo);
+    }
+
+    private void exceptionMapper_toResponse(RuntimeException exception) {
+        when(router.dispatch(any(), eq(resourceContext))).thenThrow(RuntimeException.class);
+
+        when(providers.getExceptionMapper(RuntimeException.class)).thenReturn(e -> {
+            throw exception;
+        });
+    }
+
+    private void runtimeDelegate_createHeaderDelegate(RuntimeException exception) {
         response().headers("Set-Cookie", new NewCookie.Builder("SESSION_ID").value("session").build(),
             new NewCookie.Builder("USER_ID").value("user").build()).returnFrom(router);
 
-        when(runtimeDelegate.createHeaderDelegate(NewCookie.class)).thenReturn(new RuntimeDelegate.HeaderDelegate<NewCookie>() {
+        when(runtimeDelegate.createHeaderDelegate(NewCookie.class)).thenThrow(exception);
+    }
+
+    private void headerDelegate_toString(RuntimeException exception) {
+        response().headers("Set-Cookie", new NewCookie.Builder("SESSION_ID").value("session").build(),
+            new NewCookie.Builder("USER_ID").value("user").build()).returnFrom(router);
+
+        when(runtimeDelegate.createHeaderDelegate(NewCookie.class)).thenReturn(new RuntimeDelegate.HeaderDelegate<>() {
             @Override
             public NewCookie fromString(String value) {
                 return null;
@@ -268,70 +270,39 @@ public class ResourceServletTest extends ServletTest {
                 throw exception;
             }
         });
+    }
+
+    private void webApplicationExceptionThrowFrom(Consumer<RuntimeException> caller) {
+        RuntimeException exception = new WebApplicationException(response().status(Response.Status.FORBIDDEN).build());
+
+        caller.accept(exception);
 
         HttpResponse<String> httpResponse = get("/test");
 
         assertEquals(Response.Status.FORBIDDEN.getStatusCode(), httpResponse.statusCode());
     }
 
-    @Test
-    public void should_handle_exception_thrown_by_headerDelegate_toString() {
-        response().headers("Set-Cookie", new NewCookie.Builder("SESSION_ID").value("session").build(),
-            new NewCookie.Builder("USER_ID").value("user").build()).returnFrom(router);
+    private void otherExceptionsThrowFrom(Consumer<RuntimeException> callers) {
+        RuntimeException exception = new IllegalArgumentException();
 
-        when(runtimeDelegate.createHeaderDelegate(NewCookie.class)).thenReturn(new RuntimeDelegate.HeaderDelegate<NewCookie>() {
-            @Override
-            public NewCookie fromString(String value) {
-                return null;
-            }
-
-            @Override
-            public String toString(NewCookie value) {
-                throw new IllegalArgumentException();
-            }
-        });
+        callers.accept(exception);
 
         when(providers.getExceptionMapper(eq(IllegalArgumentException.class)))
-            .thenReturn(exception -> response().status(Response.Status.FORBIDDEN).entity(null, new Annotation[0]).build());
+            .thenReturn(e -> response().status(Response.Status.FORBIDDEN).entity(null, new Annotation[0]).build());
 
         HttpResponse<String> httpResponse = get("/test");
 
         assertEquals(Response.Status.FORBIDDEN.getStatusCode(), httpResponse.statusCode());
     }
 
-    @Test
-    public void should_use_response_from_web_application_exception_thrown_by_providers_getMessageBodyWriter() {
-        WebApplicationException exception = new WebApplicationException(response().status(Response.Status.FORBIDDEN).build());
-
+    private void providers_getMessageBodyWriter(RuntimeException exception) {
         response().entity(new GenericEntity<>(2.5, Double.class), new Annotation[0]).returnFrom(router);
 
         when(providers.getMessageBodyWriter(eq(Double.class), eq(Double.class), eq(new Annotation[0]), eq(MediaType.TEXT_PLAIN_TYPE)))
             .thenThrow(exception);
-
-        HttpResponse<String> httpResponse = get("/test");
-
-        assertEquals(Response.Status.FORBIDDEN.getStatusCode(), httpResponse.statusCode());
     }
 
-    @Test
-    public void should_handle_exception_thrown_by_providers_getMessageBodyWriter() {
-        response().entity(new GenericEntity<>(2.5, Double.class), new Annotation[0]).returnFrom(router);
-
-        when(providers.getMessageBodyWriter(eq(Double.class), eq(Double.class), eq(new Annotation[0]), eq(MediaType.TEXT_PLAIN_TYPE)))
-            .thenThrow(IllegalArgumentException.class);
-
-        when(providers.getExceptionMapper(eq(IllegalArgumentException.class)))
-            .thenReturn(exception -> response().status(Response.Status.FORBIDDEN).entity(null, new Annotation[0]).build());
-
-        HttpResponse<String> httpResponse = get("/test");
-
-        assertEquals(Response.Status.FORBIDDEN.getStatusCode(), httpResponse.statusCode());
-    }
-
-    @Test
-    public void should_use_response_from_web_application_exception_thrown_by_messageBodyWriter_writeTo() {
-        WebApplicationException exception = new WebApplicationException(response().status(Response.Status.FORBIDDEN).build());
-
+    private void messageBodyWriter_writeTo(RuntimeException exception) {
         response().entity(new GenericEntity<>(2.5, Double.class), new Annotation[0]).returnFrom(router);
 
         when(providers.getMessageBodyWriter(eq(Double.class), eq(Double.class), eq(new Annotation[0]), eq(MediaType.TEXT_PLAIN_TYPE)))
@@ -346,36 +317,8 @@ public class ResourceServletTest extends ServletTest {
                     throw exception;
                 }
             });
-
-        HttpResponse<String> httpResponse = get("/test");
-
-        assertEquals(Response.Status.FORBIDDEN.getStatusCode(), httpResponse.statusCode());
     }
 
-    @Test
-    public void should_handle_exception_thrown_by_messageBodyWriter_writeTo() {
-        response().entity(new GenericEntity<>(2.5, Double.class), new Annotation[0]).returnFrom(router);
-
-        when(providers.getMessageBodyWriter(eq(Double.class), eq(Double.class), eq(new Annotation[0]), eq(MediaType.TEXT_PLAIN_TYPE)))
-            .thenReturn(new MessageBodyWriter<>() {
-                @Override
-                public boolean isWriteable(Class<?> type, Type genericType, Annotation[] annotations, MediaType mediaType) {
-                    return false;
-                }
-
-                @Override
-                public void writeTo(Double aDouble, Class<?> type, Type genericType, Annotation[] annotations, MediaType mediaType, MultivaluedMap<String, Object> httpHeaders, OutputStream entityStream) throws IOException, WebApplicationException {
-                    throw new IllegalArgumentException();
-                }
-            });
-
-        when(providers.getExceptionMapper(eq(IllegalArgumentException.class)))
-            .thenReturn(exception -> response().status(Response.Status.FORBIDDEN).entity(null, new Annotation[0]).build());
-
-        HttpResponse<String> httpResponse = get("/test");
-
-        assertEquals(Response.Status.FORBIDDEN.getStatusCode(), httpResponse.statusCode());
-    }
 
     private OutboundResponseBuilder response() {
         return new OutboundResponseBuilder();
