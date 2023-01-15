@@ -8,14 +8,22 @@ import jakarta.ws.rs.ext.MessageBodyWriter;
 import jakarta.ws.rs.ext.Providers;
 import jakarta.ws.rs.ext.RuntimeDelegate;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestFactory;
 
+import javax.print.attribute.standard.Media;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.lang.annotation.Annotation;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.net.http.HttpResponse;
+import java.util.*;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -191,16 +199,6 @@ public class ResourceServletTest extends ServletTest {
     }
 
     @Test
-    public void should_use_response_from_web_application_thrown_by_exceptionMapper_toResponse() {
-        webApplicationExceptionThrowFrom(this::exceptionMapper_toResponse);
-    }
-
-    @Test
-    public void should_handle_exception_thrown_by_exceptionMapper_toResponse() {
-        otherExceptionsThrowFrom(this::exceptionMapper_toResponse);
-    }
-
-    @Test
     public void should_use_response_from_web_application_exception_thrown_by_by_runtimeDelegate_createHeaderDelegate() {
         webApplicationExceptionThrowFrom(this::runtimeDelegate_createHeaderDelegate);
     }
@@ -220,56 +218,42 @@ public class ResourceServletTest extends ServletTest {
         otherExceptionsThrowFrom(this::headerDelegate_toString);
     }
 
-    @Test
-    public void web_application_exception_thrown_from_providers_getMessageBodyWriter() {
-        webApplicationExceptionThrowFrom(this::providers_getMessageBodyWriter);
-    }
 
-    @Test
-    public void web_application_exception_thrown_from_messageBodyWriter_writeTo() {
-        webApplicationExceptionThrowFrom(this::messageBodyWriter_writeTo);
-    }
+    @TestFactory
+    public List<DynamicTest> should_respond_based_on_exception_thrown() {
+        List<DynamicTest> tests = new ArrayList<>();
 
-    @Test
-    public void other_exception_thrown_from_providers_getMessageBodyWriter() {
-        otherExceptionsThrowFrom(this::providers_getMessageBodyWriter);
-    }
+        Map<String, Consumer<Consumer<RuntimeException>>> exceptions = Map.of(
+            "Other Exceptions", this::otherExceptionsThrowFrom,
+            "WebApplicationException", this::webApplicationExceptionThrowFrom
+        );
 
-    @Test
-    public void other_exception_thrown_from_messageBodyWriter_writeTo() {
-        otherExceptionsThrowFrom(this::messageBodyWriter_writeTo);
-    }
-
-    private void exceptionMapper_toResponse(RuntimeException exception) {
-        when(router.dispatch(any(), eq(resourceContext))).thenThrow(RuntimeException.class);
-
-        when(providers.getExceptionMapper(RuntimeException.class)).thenReturn(e -> {
-            throw exception;
-        });
-    }
-
-    private void runtimeDelegate_createHeaderDelegate(RuntimeException exception) {
-        response().headers("Set-Cookie", new NewCookie.Builder("SESSION_ID").value("session").build(),
-            new NewCookie.Builder("USER_ID").value("user").build()).returnFrom(router);
-
-        when(runtimeDelegate.createHeaderDelegate(NewCookie.class)).thenThrow(exception);
-    }
-
-    private void headerDelegate_toString(RuntimeException exception) {
-        response().headers("Set-Cookie", new NewCookie.Builder("SESSION_ID").value("session").build(),
-            new NewCookie.Builder("USER_ID").value("user").build()).returnFrom(router);
-
-        when(runtimeDelegate.createHeaderDelegate(NewCookie.class)).thenReturn(new RuntimeDelegate.HeaderDelegate<>() {
-            @Override
-            public NewCookie fromString(String value) {
-                return null;
+        for (Map.Entry<String, Consumer<Consumer<RuntimeException>>> exception : exceptions.entrySet()) {
+            for (Map.Entry<String, Consumer<RuntimeException>> caller : getCallers().entrySet()) {
+                tests.add(DynamicTest.dynamicTest(caller.getKey() + " throws " + exception.getKey(),
+                    () -> exception.getValue().accept(caller.getValue())));
             }
+        }
 
-            @Override
-            public String toString(NewCookie value) {
-                throw exception;
-            }
-        });
+        return tests;
+    }
+
+    private Map<String, Consumer<RuntimeException>> getCallers() {
+        Map<String, Consumer<RuntimeException>> callers = new HashMap<>();
+
+        for (Method method : Arrays.stream(this.getClass().getDeclaredMethods()).filter(m -> m.isAnnotationPresent(ExceptionThrownFrom.class)).toList()) {
+            String name = method.getName();
+            String callerName = name.substring(0, 1).toUpperCase() + name.substring(1).replaceAll("_", ".");
+            callers.put(callerName, e -> {
+                try {
+                    method.invoke(this, e);
+                } catch (InvocationTargetException | IllegalAccessException ex) {
+                    throw (RuntimeException) ex.getCause();
+                }
+            });
+        }
+
+        return callers;
     }
 
     private void webApplicationExceptionThrowFrom(Consumer<RuntimeException> caller) {
@@ -295,6 +279,21 @@ public class ResourceServletTest extends ServletTest {
         assertEquals(Response.Status.FORBIDDEN.getStatusCode(), httpResponse.statusCode());
     }
 
+    @Retention(RetentionPolicy.RUNTIME)
+    @interface ExceptionThrownFrom {
+
+    }
+
+    @ExceptionThrownFrom
+    private void exceptionMapper_toResponse(RuntimeException exception) {
+        when(router.dispatch(any(), eq(resourceContext))).thenThrow(RuntimeException.class);
+
+        when(providers.getExceptionMapper(RuntimeException.class)).thenReturn(e -> {
+            throw exception;
+        });
+    }
+
+    @ExceptionThrownFrom
     private void providers_getMessageBodyWriter(RuntimeException exception) {
         response().entity(new GenericEntity<>(2.5, Double.class), new Annotation[0]).returnFrom(router);
 
@@ -302,6 +301,7 @@ public class ResourceServletTest extends ServletTest {
             .thenThrow(exception);
     }
 
+    @ExceptionThrownFrom
     private void messageBodyWriter_writeTo(RuntimeException exception) {
         response().entity(new GenericEntity<>(2.5, Double.class), new Annotation[0]).returnFrom(router);
 
@@ -319,6 +319,27 @@ public class ResourceServletTest extends ServletTest {
             });
     }
 
+    private void runtimeDelegate_createHeaderDelegate(RuntimeException exception) {
+        response().headers(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN_TYPE).returnFrom(router);
+
+        when(runtimeDelegate.createHeaderDelegate(MediaType.class)).thenThrow(exception);
+    }
+
+    private void headerDelegate_toString(RuntimeException exception) {
+        response().headers(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN_TYPE).returnFrom(router);
+
+        when(runtimeDelegate.createHeaderDelegate(MediaType.class)).thenReturn(new RuntimeDelegate.HeaderDelegate<>() {
+            @Override
+            public MediaType fromString(String value) {
+                return null;
+            }
+
+            @Override
+            public String toString(MediaType value) {
+                throw exception;
+            }
+        });
+    }
 
     private OutboundResponseBuilder response() {
         return new OutboundResponseBuilder();
