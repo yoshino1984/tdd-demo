@@ -198,27 +198,6 @@ public class ResourceServletTest extends ServletTest {
         assertEquals(Response.Status.FORBIDDEN.getStatusCode(), httpResponse.statusCode());
     }
 
-    @Test
-    public void should_use_response_from_web_application_exception_thrown_by_by_runtimeDelegate_createHeaderDelegate() {
-        webApplicationExceptionThrowFrom(this::runtimeDelegate_createHeaderDelegate);
-    }
-
-    @Test
-    public void should_handle_exception_thrown_by_runtimeDelegate_createHeaderDelegate() {
-        otherExceptionsThrowFrom(this::runtimeDelegate_createHeaderDelegate);
-    }
-
-    @Test
-    public void should_use_response_from_web_application_exception_thrown_by_headerDelegate_toString() {
-        webApplicationExceptionThrowFrom(this::headerDelegate_toString);
-    }
-
-    @Test
-    public void should_handle_exception_thrown_by_headerDelegate_toString() {
-        otherExceptionsThrowFrom(this::headerDelegate_toString);
-    }
-
-
     @TestFactory
     public List<DynamicTest> should_respond_based_on_exception_thrown() {
         List<DynamicTest> tests = new ArrayList<>();
@@ -248,6 +227,8 @@ public class ResourceServletTest extends ServletTest {
                 try {
                     method.invoke(this, e);
                 } catch (InvocationTargetException | IllegalAccessException ex) {
+                    System.out.println(e);
+                    ex.printStackTrace();
                     throw (RuntimeException) ex.getCause();
                 }
             });
@@ -319,16 +300,18 @@ public class ResourceServletTest extends ServletTest {
             });
     }
 
+    @ExceptionThrownFrom
     private void runtimeDelegate_createHeaderDelegate(RuntimeException exception) {
         response().headers(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN_TYPE).returnFrom(router);
 
-        when(runtimeDelegate.createHeaderDelegate(MediaType.class)).thenThrow(exception);
+        when(runtimeDelegate.createHeaderDelegate(eq(MediaType.class))).thenThrow(exception);
     }
 
+    @ExceptionThrownFrom
     private void headerDelegate_toString(RuntimeException exception) {
         response().headers(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN_TYPE).returnFrom(router);
 
-        when(runtimeDelegate.createHeaderDelegate(MediaType.class)).thenReturn(new RuntimeDelegate.HeaderDelegate<>() {
+        when(runtimeDelegate.createHeaderDelegate(eq(MediaType.class))).thenReturn(new RuntimeDelegate.HeaderDelegate<>() {
             @Override
             public MediaType fromString(String value) {
                 return null;
